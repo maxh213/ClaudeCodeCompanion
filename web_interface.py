@@ -78,6 +78,53 @@ def save_settings():
         logger.error(f"Error saving settings: {e}")
         return False
 
+def get_git_commits(repo_path, since_time=None):
+    """Get git commits from a repository.
+    
+    Args:
+        repo_path (str): Path to the repository.
+        since_time (datetime, optional): Only get commits after this time.
+        
+    Returns:
+        list: List of commit objects with timestamp, message and author.
+    """
+    try:
+        import subprocess
+        from datetime import datetime
+        
+        # Format for git log
+        format_string = '--pretty=format:{"hash": "%h", "author": "%an", "timestamp": "%ai", "message": "%s"}'
+        
+        # Command to get commits
+        cmd = ['git', '-C', repo_path, 'log', format_string]
+        
+        # Add since time if provided
+        if since_time:
+            since_str = since_time.strftime('%Y-%m-%d %H:%M:%S')
+            cmd.extend(['--since', since_str])
+        
+        # Run the command
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            logger.error(f"Error getting git commits: {result.stderr}")
+            return []
+        
+        # Parse the output
+        commits = []
+        for line in result.stdout.strip().split('\n'):
+            if line:
+                try:
+                    commit = json.loads(line)
+                    commits.append(commit)
+                except json.JSONDecodeError:
+                    logger.warning(f"Could not parse commit: {line}")
+        
+        return commits
+    except Exception as e:
+        logger.error(f"Error getting git commits: {e}")
+        return []
+
 def init_session(repo_path, todo_file='TODO.md', session_id=None):
     """Initialize a new session."""
     global CURRENT_SESSION_ID, LOGGER, CONVERSATION_TRACKER
@@ -100,6 +147,19 @@ def init_session(repo_path, todo_file='TODO.md', session_id=None):
     repo_path = Path(repo_path).absolute()
     todo_path = repo_path / todo_file
     
+    # Get initial count of completed tasks
+    initial_completed_count = 0
+    try:
+        todo_content = read_file(todo_path)
+        for line in todo_content.split('\n'):
+            if '[x]' in line or '[X]' in line:
+                initial_completed_count += 1
+    except:
+        pass
+    
+    # Get start time and initialize session duration
+    start_time = datetime.now()
+    
     # Initialize session state
     SESSIONS[session_id] = {
         "session_id": session_id,
@@ -109,9 +169,21 @@ def init_session(repo_path, todo_file='TODO.md', session_id=None):
         "completed_tasks": [],
         "current_task": None,
         "task_count": 0,
-        "created_at": datetime.now().isoformat(),
-        "status": "active"
+        "created_at": start_time.isoformat(),
+        "last_updated_at": start_time.isoformat(),
+        "duration_seconds": 0,
+        "initial_completed_count": initial_completed_count,
+        "status": "active",
+        "initial_git_commit": None
     }
+    
+    # Try to get the latest git commit hash
+    try:
+        commits = get_git_commits(str(repo_path), None)
+        if commits:
+            SESSIONS[session_id]["initial_git_commit"] = commits[0]["hash"]
+    except:
+        pass
     
     return SESSIONS[session_id]
 
@@ -142,10 +214,30 @@ def get_task_status(session_id=None):
             elif '[x]' in line or '[X]' in line:
                 completed_tasks.append(line.strip())
         
+        # Calculate completion percentage
+        total_tasks = len(pending_tasks) + len(review_tasks) + len(completed_tasks)
+        completion_percentage = 0
+        if total_tasks > 0:
+            completion_percentage = round((len(completed_tasks) / total_tasks) * 100)
+        
+        # Calculate session progress percentage
+        session_start_tasks = session.get('initial_completed_count', 0)
+        session_progress = 0
+        if total_tasks > session_start_tasks:
+            tasks_in_session = len(completed_tasks) - session_start_tasks
+            session_progress = round((tasks_in_session / (total_tasks - session_start_tasks)) * 100)
+        
+        # Check if all tasks are completed
+        all_completed = len(pending_tasks) == 0 and len(review_tasks) == 0 and len(completed_tasks) > 0
+        
         return {
             'pending': pending_tasks,
             'review': review_tasks,
-            'completed': completed_tasks
+            'completed': completed_tasks,
+            'total': total_tasks,
+            'completion_percentage': completion_percentage,
+            'session_progress': session_progress,
+            'all_completed': all_completed
         }
     except Exception as e:
         if LOGGER:
@@ -295,6 +387,37 @@ def new_session():
     
     return render_template('new_session.html')
 
+def get_session_duration(session):
+    """Calculate the session duration and update the session."""
+    try:
+        # Get the created_at timestamp
+        created_at = datetime.fromisoformat(session["created_at"])
+        
+        # Calculate duration
+        now = datetime.now()
+        duration_seconds = (now - created_at).total_seconds()
+        
+        # Update session
+        session["duration_seconds"] = duration_seconds
+        session["last_updated_at"] = now.isoformat()
+        
+        # Format duration as string
+        hours = int(duration_seconds // 3600)
+        minutes = int((duration_seconds % 3600) // 60)
+        seconds = int(duration_seconds % 60)
+        
+        if hours > 0:
+            duration_str = f"{hours}h {minutes}m {seconds}s"
+        elif minutes > 0:
+            duration_str = f"{minutes}m {seconds}s"
+        else:
+            duration_str = f"{seconds}s"
+        
+        return duration_str
+    except Exception as e:
+        logger.error(f"Error calculating session duration: {e}")
+        return "Unknown"
+
 @app.route('/session/<session_id>')
 def session(session_id):
     """View a session."""
@@ -315,6 +438,7 @@ def session(session_id):
             return redirect(url_for('index'))
     
     CURRENT_SESSION_ID = session_id
+    session_obj = SESSIONS[session_id]
     
     # Get task status
     task_status = get_task_status(session_id)
@@ -322,10 +446,39 @@ def session(session_id):
     # Get logs
     logs = get_session_logs(session_id)
     
+    # Calculate session duration
+    duration_str = get_session_duration(session_obj)
+    
+    # Get git commits for this session
+    git_commits = []
+    if session_obj.get("initial_git_commit"):
+        try:
+            created_at = datetime.fromisoformat(session_obj["created_at"])
+            git_commits = get_git_commits(session_obj["repo_path"], created_at)
+        except Exception as e:
+            logger.error(f"Error getting git commits: {e}")
+    
+    # Check if all tasks are completed - auto-stop
+    if task_status and task_status.get('all_completed') and session_obj["status"] == "active":
+        session_obj["status"] = "completed"
+        session_obj["completed_at"] = datetime.now().isoformat()
+        
+        # Save updated session
+        try:
+            log_dir = Path("./logs") / session_id
+            with open(log_dir / "session_info.json", 'w') as f:
+                json.dump(session_obj, f, indent=2)
+            
+            flash("All tasks completed! Session automatically marked as complete.", "success")
+        except Exception as e:
+            logger.error(f"Error saving session info: {e}")
+    
     return render_template('session.html', 
-                          session=SESSIONS[session_id],
+                          session=session_obj,
                           task_status=task_status,
                           logs=logs,
+                          duration=duration_str,
+                          git_commits=git_commits,
                           ollama_enabled=APP_SETTINGS.get("ollama_enabled", False))
 
 @app.route('/session/<session_id>/tasks')
