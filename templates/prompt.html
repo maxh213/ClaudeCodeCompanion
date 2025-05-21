@@ -50,10 +50,39 @@
                                 <button id="copy-prompt" class="btn btn-sm btn-outline-secondary">
                                     <i class="bi bi-clipboard"></i> Copy to Clipboard
                                 </button>
+                                
+                                <div class="btn-group">
+                                    <a href="{{ url_for('todo_preview', session_id=session.session_id) }}" class="btn btn-sm btn-outline-secondary">
+                                        <i class="bi bi-file-earmark-text"></i> TODO Preview
+                                    </a>
+                                    {% if conversation_id %}
+                                    <a href="{{ url_for('view_conversation', session_id=session.session_id, conversation_id=conversation_id) }}" class="btn btn-sm btn-outline-secondary">
+                                        <i class="bi bi-chat-text"></i> View Conversation
+                                    </a>
+                                    {% endif %}
+                                </div>
                             </div>
                             <pre class="border rounded p-3 bg-light" id="prompt-content">{{ prompt }}</pre>
                         </div>
                     </div>
+                    
+                    {% if ollama_enabled and ollama_response %}
+                    <div class="mb-4">
+                        <div class="card">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0 d-flex justify-content-between align-items-center">
+                                    <span><i class="bi bi-cpu"></i> Ollama Response</span>
+                                    <button id="use-ollama-response" class="btn btn-sm btn-light">
+                                        <i class="bi bi-arrow-down-circle"></i> Use This Response
+                                    </button>
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <pre class="border rounded p-3 bg-light" id="ollama-response">{{ ollama_response }}</pre>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
                     
                     <div class="mb-4">
                         <h5 class="border-bottom pb-2 mb-3">
@@ -62,6 +91,9 @@
                         <form action="{{ url_for('submit_response', session_id=session.session_id) }}" method="post">
                             <input type="hidden" name="task" value="{{ task }}">
                             <input type="hidden" name="task_type" value="{{ task_type }}">
+                            {% if conversation_id %}
+                            <input type="hidden" name="conversation_id" value="{{ conversation_id }}">
+                            {% endif %}
                             
                             <div class="mb-3">
                                 <label for="response" class="form-label">Paste Claude's response below:</label>
@@ -73,9 +105,14 @@
                                 <button type="submit" class="btn btn-success">
                                     <i class="bi bi-check-circle"></i> Submit Response
                                 </button>
-                                <a href="{{ url_for('tasks', session_id=session.session_id) }}" class="btn btn-outline-secondary">
-                                    <i class="bi bi-arrow-left"></i> Back to Tasks
-                                </a>
+                                <div class="btn-group">
+                                    <a href="{{ url_for('tasks', session_id=session.session_id) }}" class="btn btn-outline-secondary">
+                                        <i class="bi bi-list-check"></i> Tasks
+                                    </a>
+                                    <a href="{{ url_for('prompt', session_id=session.session_id) }}" class="btn btn-outline-secondary">
+                                        <i class="bi bi-arrow-left"></i> Back to Form
+                                    </a>
+                                </div>
                             </div>
                         </form>
                     </div>
@@ -110,6 +147,22 @@
                         }, 2000);
                     }
                 );
+            });
+        }
+        
+        // Ollama response handling
+        const useOllamaButton = document.getElementById('use-ollama-response');
+        const ollamaResponse = document.getElementById('ollama-response');
+        const responseTextarea = document.getElementById('response');
+        
+        if (useOllamaButton && ollamaResponse && responseTextarea) {
+            useOllamaButton.addEventListener('click', function() {
+                responseTextarea.value = ollamaResponse.textContent;
+                window.scrollTo({
+                    top: responseTextarea.offsetTop - 100,
+                    behavior: 'smooth'
+                });
+                responseTextarea.focus();
             });
         }
     });
