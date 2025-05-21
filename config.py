@@ -34,16 +34,6 @@ Follow these steps precisely:
     *   Do **NOT** add new, unrelated TODOs or plan future work beyond the immediate next step for the completed item if necessary.
 
 **Crucial Instruction:** Focus exclusively on the single task you select. Do not outline a plan for multiple tasks or work on anything beyond the one item identified in Step 2. Before committing your changes ask me to verify it worked ok and test. You don't need to run the project I will handle that.
-
-Here is the current content of TODO.md:
-{todo_content}
-
-Additional context:
-Here is the README.md content:
-{readme_content}
-{projectbrief_section}
-{testing_summary_section}
-{claude_md_section}
 """
 
 # Review prompt template
@@ -67,14 +57,35 @@ Follow these steps precisely:
     *   Do **NOT** add new, unrelated TODOs or plan future work beyond the immediate next step for the completed item if necessary.
 
 **Crucial Instruction:** Focus exclusively on the single task you are reviewing. Do not outline a plan for multiple tasks or work on anything beyond the one item identified in Step 2. Before committing your changes ask me to verify it worked ok and test. You don't need to run the project I will handle that.
+"""
 
-Here is the current content of TODO.md:
-{todo_content}
+# Empty TODO list template
+EMPTY_TODO_TEMPLATE = """You are an expert senior software engineer working on production enhancements.
 
-Additional context:
-Here is the README.md content:
-{readme_content}
-{projectbrief_section}
-{testing_summary_section}
-{claude_md_section}
+I notice that the TODO.md file is empty or doesn't contain any tasks marked with "[ ]" or "[R]". This means there are no specific tasks for you to work on at the moment.
+
+Here are some suggestions for what you could do:
+
+1. If you believe all tasks have been completed, congratulate the team on a job well done.
+
+2. If this is a new project, you could suggest creating a TODO.md file with some initial tasks based on the project's README.md and other documentation.
+
+3. If there are tasks in the TODO.md but they are not formatted correctly (they should use "- [ ]" format), you could offer to reformat them.
+
+Please respond with your thoughts on the current state of the project and any recommendations you have for next steps. You can also ask the user if there are specific tasks they would like you to focus on.
+"""
+
+# All tasks completed template
+ALL_TASKS_COMPLETED_TEMPLATE = """You are an expert senior software engineer working on production enhancements.
+
+Congratulations! It appears that all tasks in the TODO.md file have been completed. This is an excellent milestone for the project.
+
+Would you like me to:
+
+1. Review the entire project for any potential improvements or optimizations?
+2. Suggest new features or enhancements that could be added to the project?
+3. Create a new set of tasks for the next phase of development?
+4. Something else?
+
+Please let me know how you'd like to proceed, and I'd be happy to help with the next steps.
 """

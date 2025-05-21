@@ -8,7 +8,12 @@ import re
 import logging
 import subprocess
 from pathlib import Path
-from config import TASK_PROMPT_TEMPLATE, REVIEW_PROMPT_TEMPLATE
+from config import (
+    TASK_PROMPT_TEMPLATE, 
+    REVIEW_PROMPT_TEMPLATE, 
+    EMPTY_TODO_TEMPLATE,
+    ALL_TASKS_COMPLETED_TEMPLATE
+)
 
 def setup_logging(log_level):
     """Set up logging configuration."""
@@ -221,37 +226,45 @@ def get_next_task(todo_content):
     
     if review_tasks:
         # Return the first task marked for review
-        return review_tasks[0].strip()
+        return review_tasks[0].strip(), "review"
     
     # If no review tasks, look for uncompleted tasks (lines with "[ ]")
     uncompleted_tasks = re.findall(r'^(\s*[-*] \[ \].+)$', todo_content, re.MULTILINE)
     
     if uncompleted_tasks:
         # Return the first uncompleted task
-        return uncompleted_tasks[0].strip()
+        return uncompleted_tasks[0].strip(), "task"
     
-    return None
+    # Check if there are any completed tasks
+    completed_tasks = re.findall(r'^(\s*[-*] \[x\].+)$', todo_content, re.MULTILINE)
+    
+    if completed_tasks:
+        # All tasks are completed
+        return None, "completed"
+    
+    # No tasks found at all
+    return None, "empty"
 
-def format_prompt_for_task(task, todo_content, readme_content, projectbrief_content, testing_summary_content, claude_md_content):
+def format_prompt_for_task(task, **kwargs):
     """Format the prompt for Claude to work on a task."""
     prompt = TASK_PROMPT_TEMPLATE.format(
-        task=task,
-        todo_content=todo_content,
-        readme_content=readme_content,
-        projectbrief_section=f"Here is the projectbrief.md content:\n```\n{projectbrief_content}\n```" if projectbrief_content else "",
-        testing_summary_section=f"Here is the testing_summary.md content:\n```\n{testing_summary_content}\n```" if testing_summary_content else "",
-        claude_md_section=f"Here is the CLAUDE.md content:\n```\n{claude_md_content}\n```" if claude_md_content else ""
+        task=task
     )
     return prompt
 
-def format_prompt_for_review(task, todo_content, readme_content, projectbrief_content, testing_summary_content, claude_md_content):
+def format_prompt_for_review(task, **kwargs):
     """Format the prompt for Claude to review a task."""
     prompt = REVIEW_PROMPT_TEMPLATE.format(
-        task=task,
-        todo_content=todo_content,
-        readme_content=readme_content,
-        projectbrief_section=f"Here is the projectbrief.md content:\n```\n{projectbrief_content}\n```" if projectbrief_content else "",
-        testing_summary_section=f"Here is the testing_summary.md content:\n```\n{testing_summary_content}\n```" if testing_summary_content else "",
-        claude_md_section=f"Here is the CLAUDE.md content:\n```\n{claude_md_content}\n```" if claude_md_content else ""
+        task=task
     )
+    return prompt
+
+def format_prompt_for_empty_todo(**kwargs):
+    """Format the prompt for Claude when there are no tasks in the TODO list."""
+    prompt = EMPTY_TODO_TEMPLATE
+    return prompt
+
+def format_prompt_for_all_completed(**kwargs):
+    """Format the prompt for Claude when all tasks in the TODO list are completed."""
+    prompt = ALL_TASKS_COMPLETED_TEMPLATE
     return prompt

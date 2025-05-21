@@ -22,7 +22,9 @@ from utils import (
     commit_changes,
     get_next_task,
     format_prompt_for_task,
-    format_prompt_for_review
+    format_prompt_for_review,
+    format_prompt_for_empty_todo,
+    format_prompt_for_all_completed
 )
 
 def parse_arguments():
@@ -183,6 +185,45 @@ def initialize_session(config):
     logging.info(f"Started new session {session_id} on branch {branch_name}")
     return session_state
 
+def run_claude_api(prompt, repo_path, api_key=None):
+    """Run a Claude API request.
+    
+    This is a placeholder for the direct Claude API integration.
+    In a real implementation, this would use the Claude API client to send a message
+    and receive a response.
+    """
+    # This is intentionally left as a placeholder
+    # In a real implementation, we would use something like:
+    # from claude_api import ClaudeAPI
+    # client = ClaudeAPI(api_key)
+    # response = client.message(prompt)
+    
+    # Inform the user what's happening
+    print(f"\n[Claude Agent] Working on task in {repo_path}...")
+    print("[Claude Agent] Sending prompt to Claude...")
+    
+    # For now, we'll just show the prompt and ask the user to manually provide the Claude output
+    print("\n" + "="*80)
+    print("PROMPT FOR CLAUDE:")
+    print("="*80)
+    print(prompt)
+    print("="*80 + "\n")
+    
+    # Wait for the user to run this through Claude and provide the output
+    print("[Claude Agent] Please copy this prompt to Claude and paste Claude's response below.")
+    print("[Claude Agent] Type 'DONE' on a new line when finished.")
+    
+    # Collect user input until they indicate they're done
+    lines = []
+    while True:
+        line = input()
+        if line.strip() == "DONE":
+            break
+        lines.append(line)
+    
+    response = "\n".join(lines)
+    return response
+
 def run_claude_interaction(config, session_state, is_review=False):
     """Run a single Claude interaction for a task or review."""
     repo_path = Path(config['repo_path'])
@@ -191,57 +232,59 @@ def run_claude_interaction(config, session_state, is_review=False):
     # Read project files
     try:
         todo_content = read_file(todo_path)
-        readme_content = read_file(repo_path / "README.md") if (repo_path / "README.md").exists() else ""
-        projectbrief_content = read_file(repo_path / "projectbrief.md") if (repo_path / "projectbrief.md").exists() else ""
-        testing_summary_content = read_file(repo_path / "testing_summary.md") if (repo_path / "testing_summary.md").exists() else ""
-        claude_md_content = read_file(repo_path / "CLAUDE.md") if (repo_path / "CLAUDE.md").exists() else ""
     except Exception as e:
-        logging.error(f"Error reading project files: {e}")
+        logging.error(f"Error reading TODO file: {e}")
         return False
     
     if is_review and session_state['current_task']:
         # We're reviewing the previous task
         prompt = format_prompt_for_review(
-            session_state['current_task'],
-            todo_content,
-            readme_content,
-            projectbrief_content,
-            testing_summary_content,
-            claude_md_content
+            session_state['current_task']
         )
         logging.info(f"Reviewing task: {session_state['current_task']}")
+        task_type = "review"
     else:
         # We're starting a new task
-        next_task = get_next_task(todo_content)
-        if not next_task:
-            logging.info("No more tasks found in TODO.md")
+        next_task, task_type = get_next_task(todo_content)
+        
+        if task_type == "empty":
+            # No tasks found in TODO.md
+            prompt = format_prompt_for_empty_todo()
+            logging.info("No tasks found in TODO.md")
+        elif task_type == "completed":
+            # All tasks are completed
+            prompt = format_prompt_for_all_completed()
+            logging.info("All tasks completed in TODO.md")
+        elif task_type == "review" or task_type == "task":
+            # Regular task found
+            session_state['current_task'] = next_task
+            session_state['task_count'] += 1
+            save_session_state(session_state)
+            
+            prompt = format_prompt_for_task(next_task)
+            logging.info(f"Starting task: {next_task}")
+        else:
+            logging.error(f"Unknown task type: {task_type}")
             return False
-        
-        session_state['current_task'] = next_task
-        session_state['task_count'] += 1
-        save_session_state(session_state)
-        
-        prompt = format_prompt_for_task(
-            next_task,
-            todo_content,
-            readme_content,
-            projectbrief_content,
-            testing_summary_content,
-            claude_md_content
-        )
-        logging.info(f"Starting task: {next_task}")
     
-    # Print the prompt for the user to give to Claude
-    print("\n" + "="*80)
-    print("CLAUDE PROMPT:")
-    print("="*80)
-    print(prompt)
-    print("="*80 + "\n")
+    # Run the Claude interaction
+    print(f"\n[Claude Agent] Processing {'review' if is_review else 'task'}...")
     
-    # Wait for user to confirm task completion
-    input("Press Enter once Claude has completed the task and you're ready to continue...")
+    # Check for API key
+    api_key = os.environ.get("CLAUDE_API_KEY")
+    if not api_key:
+        print("[Claude Agent] No CLAUDE_API_KEY found in environment variables.")
+        print("[Claude Agent] Using manual interaction mode.")
     
-    # Commit the changes
+    # Call Claude API (or manual fallback)
+    claude_response = run_claude_api(prompt, repo_path, api_key)
+    
+    # Handle different task types
+    if task_type == "empty" or task_type == "completed":
+        # No need to commit anything for empty or completed task lists
+        return True
+    
+    # Commit the changes for regular tasks
     if not is_review:
         commit_message = f"Mark task for review: {session_state['current_task']}"
     else:
@@ -266,6 +309,10 @@ def main():
     config = load_config(args)
     session_state = initialize_session(config)
     
+    print(f"\n[Claude Agent] Starting session on branch: {session_state['branch_name']}")
+    print(f"[Claude Agent] Working with repository: {config['repo_path']}")
+    print(f"[Claude Agent] TODO file: {config['todo_file']}")
+    
     # Main loop for processing tasks
     try:
         max_tasks = config["max_tasks"]
@@ -274,33 +321,39 @@ def main():
         while max_tasks == 0 or session_state["task_count"] < max_tasks:
             # If previous task is complete, start a new task; otherwise, review previous task
             if task_complete:
+                print("\n[Claude Agent] Working on a new task...")
                 task_complete = run_claude_interaction(config, session_state, is_review=False)
             else:
                 # This is a review step
+                print("\n[Claude Agent] Reviewing the previously implemented task...")
                 run_claude_interaction(config, session_state, is_review=True)
                 task_complete = True  # After review, mark as complete and move to next task
             
             # Clear context message
             print("\n" + "="*80)
-            print("CONTEXT CLEARED!")
-            print("Claude's context has been cleared. Start a new interaction for the next task.")
+            print("[Claude Agent] CONTEXT CLEARED!")
+            print("[Claude Agent] Claude's context has been cleared. Next iteration will be a fresh interaction.")
             print("="*80 + "\n")
             
             # Ask if user wants to continue
-            response = input("Continue to next task? (y/n): ").strip().lower()
+            response = input("[Claude Agent] Continue to next task? (y/n): ").strip().lower()
             if response != 'y':
                 logging.info("Session ended by user")
+                print("[Claude Agent] Session ended by user request.")
                 break
     
     except KeyboardInterrupt:
         logging.info("Session interrupted by user")
+        print("\n[Claude Agent] Session interrupted by user.")
     except Exception as e:
         logging.error(f"Error in main loop: {e}")
+        print(f"\n[Claude Agent] Error in main loop: {e}")
     
-    print(f"\nSession {session_state['session_id']} completed.")
-    print(f"Branch: {session_state['branch_name']}")
-    print(f"PR URL: {session_state['pr_url']}")
-    print(f"Completed tasks: {len(session_state['completed_tasks'])}")
+    # Summary message
+    print(f"\n[Claude Agent] Session {session_state['session_id']} completed.")
+    print(f"[Claude Agent] Branch: {session_state['branch_name']}")
+    print(f"[Claude Agent] PR URL: {session_state['pr_url']}")
+    print(f"[Claude Agent] Completed tasks: {len(session_state['completed_tasks'])}")
     
     return 0
 
