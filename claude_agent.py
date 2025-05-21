@@ -252,8 +252,8 @@ def run_claude_api(prompt, repo_path, api_key=None):
         # Process output line by line as it comes in
         if process.stdout:
             for line in process.stdout:
-                # Print the line to show streaming output
-                print(line, end='', flush=True)
+                # Store original line for debugging if needed
+                # print(line, end='', flush=True)  # Commented out to reduce noise
                 
                 # Collect all output
                 full_output.append(line)
@@ -262,25 +262,82 @@ def run_claude_api(prompt, repo_path, api_key=None):
                 try:
                     obj = json.loads(line)
                     
-                    # Format assistant messages nicely
-                    if isinstance(obj, dict) and obj.get('role') == 'assistant' and 'content' in obj:
+                    # Handle different message types with human-readable formatting
+                    if "type" in obj:
+                        message_type = obj.get("type")
+                        
+                        # Assistant messages (Claude's thinking)
+                        if message_type == "assistant":
+                            message = obj.get("message", {})
+                            content_items = message.get("content", [])
+                            
+                            for item in content_items:
+                                if isinstance(item, dict):
+                                    # Handle text content nicely
+                                    if item.get("type") == "text":
+                                        text = item.get("text", "").strip()
+                                        if text:
+                                            sys.stdout.write("\033[34m")  # Blue text
+                                            print(f"\n🤖 Claude: {text}\n")
+                                            sys.stdout.write("\033[0m")  # Reset color
+                                    
+                                    # Handle tool use (when Claude is using a tool)
+                                    elif item.get("type") == "tool_use":
+                                        tool_name = item.get("name", "")
+                                        if tool_name:
+                                            print(f"🔧 Claude is using tool: {tool_name}")
+                        
+                        # User messages (results from tools)
+                        elif message_type == "user":
+                            content_items = obj.get("message", {}).get("content", [])
+                            for item in content_items:
+                                if isinstance(item, dict):
+                                    if item.get("type") == "tool_result":
+                                        content = item.get("content", "").strip()
+                                        is_error = item.get("is_error", False)
+                                        
+                                        if is_error:
+                                            sys.stdout.write("\033[31m")  # Red for errors
+                                            print(f"❌ Tool error: {content}")
+                                            sys.stdout.write("\033[0m")  # Reset color
+                                        elif content and len(content) < 150:  # Only short results
+                                            sys.stdout.write("\033[32m")  # Green for tool results
+                                            print(f"✅ Tool result: {content[:150]}...")
+                                            sys.stdout.write("\033[0m")  # Reset color
+                        
+                        # System messages (stats and final results)
+                        elif message_type == "system":
+                            subtype = obj.get("subtype", "")
+                            if subtype == "init":
+                                print("\n✨ Claude Code initialized and ready to work\n")
+                            if "result" in obj:
+                                final_result = obj["result"]
+                                print("\n✅ Task completed")
+                            if "cost_usd" in obj:
+                                print(f"💰 Cost: ${obj['cost_usd']:.5f}")
+                            if "duration_ms" in obj:
+                                print(f"⏱️ Duration: {obj['duration_ms']/1000:.2f} seconds")
+                    
+                    # Legacy message format handling
+                    elif isinstance(obj, dict) and obj.get('role') == 'assistant' and 'content' in obj:
                         content = obj.get('content', '')
                         if content:
                             sys.stdout.write("\033[34m")  # Blue text for Claude's responses
-                            print(f"CLAUDE: {content}")
+                            print(f"\n🤖 Claude: {content}\n")
                             sys.stdout.write("\033[0m")  # Reset color
                     
-                    # Get the final result from the system message
-                    if isinstance(obj, dict) and obj.get('role') == 'system':
+                    # Legacy system message format
+                    elif isinstance(obj, dict) and obj.get('role') == 'system':
                         if 'result' in obj:
                             final_result = obj['result']
+                            print("\n✅ Task completed")
                         if 'cost_usd' in obj:
-                            print(f"[Claude Agent] Cost: ${obj['cost_usd']:.5f}")
+                            print(f"💰 Cost: ${obj['cost_usd']:.5f}")
                         if 'duration_ms' in obj:
-                            print(f"[Claude Agent] Duration: {obj['duration_ms']/1000:.2f} seconds")
+                            print(f"⏱️ Duration: {obj['duration_ms']/1000:.2f} seconds")
                             
                 except json.JSONDecodeError:
-                    # Not JSON, might be progress indicator or other output
+                    # Silent failure for non-JSON lines
                     pass
         else:
             print("[Claude Agent] Error: Process stdout not available")
