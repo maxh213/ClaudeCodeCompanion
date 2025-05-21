@@ -1,0 +1,117 @@
+{% extends "layout.html" %}
+
+{% block title %}Claude Prompt{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-chat-dots"></i> Claude Prompt
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if error %}
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle"></i> {{ error }}
+                    </div>
+                    <div class="d-grid gap-2 mt-3">
+                        <a href="{{ url_for('prompt', session_id=session.session_id) }}" class="btn btn-outline-primary">
+                            <i class="bi bi-arrow-left"></i> Back to Prompt Generator
+                        </a>
+                    </div>
+                    {% else %}
+                    <div class="mb-4">
+                        <div class="alert alert-info">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-info-circle fs-4 me-2"></i>
+                                <div>
+                                    <strong>
+                                        {% if task_type == 'review' %}
+                                        You are reviewing task: 
+                                        {% else %}
+                                        You are working on task: 
+                                        {% endif %}
+                                    </strong>
+                                    {{ task }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h5 class="border-bottom pb-2 mb-3">
+                            <i class="bi bi-chat-square-text"></i> Prompt for Claude
+                        </h5>
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-2">
+                                <button id="copy-prompt" class="btn btn-sm btn-outline-secondary">
+                                    <i class="bi bi-clipboard"></i> Copy to Clipboard
+                                </button>
+                            </div>
+                            <pre class="border rounded p-3 bg-light" id="prompt-content">{{ prompt }}</pre>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h5 class="border-bottom pb-2 mb-3">
+                            <i class="bi bi-reply"></i> Claude's Response
+                        </h5>
+                        <form action="{{ url_for('submit_response', session_id=session.session_id) }}" method="post">
+                            <input type="hidden" name="task" value="{{ task }}">
+                            <input type="hidden" name="task_type" value="{{ task_type }}">
+                            
+                            <div class="mb-3">
+                                <label for="response" class="form-label">Paste Claude's response below:</label>
+                                <textarea class="form-control" id="response" name="response" rows="12" required
+                                          placeholder="Paste Claude's full response here..."></textarea>
+                            </div>
+                            
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-success">
+                                    <i class="bi bi-check-circle"></i> Submit Response
+                                </button>
+                                <a href="{{ url_for('tasks', session_id=session.session_id) }}" class="btn btn-outline-secondary">
+                                    <i class="bi bi-arrow-left"></i> Back to Tasks
+                                </a>
+                            </div>
+                        </form>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const copyButton = document.getElementById('copy-prompt');
+        const promptContent = document.getElementById('prompt-content');
+        
+        if (copyButton && promptContent) {
+            copyButton.addEventListener('click', function() {
+                const textToCopy = promptContent.textContent;
+                navigator.clipboard.writeText(textToCopy).then(
+                    function() {
+                        copyButton.innerHTML = '<i class="bi bi-check"></i> Copied!';
+                        setTimeout(function() {
+                            copyButton.innerHTML = '<i class="bi bi-clipboard"></i> Copy to Clipboard';
+                        }, 2000);
+                    },
+                    function() {
+                        copyButton.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Failed to copy';
+                        setTimeout(function() {
+                            copyButton.innerHTML = '<i class="bi bi-clipboard"></i> Copy to Clipboard';
+                        }, 2000);
+                    }
+                );
+            });
+        }
+    });
+</script>
+{% endblock %}

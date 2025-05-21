@@ -1,0 +1,123 @@
+{% extends "layout.html" %}
+
+{% block title %}Generate Prompt{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-chat-dots"></i> Generate Prompt for Claude
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if error %}
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle"></i> {{ error }}
+                    </div>
+                    {% endif %}
+                    
+                    <form method="post" action="{{ url_for('prompt', session_id=session.session_id) }}">
+                        <div class="mb-3">
+                            <label class="form-label">Prompt Type</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="task_type" id="type_new" value="new" checked>
+                                <label class="form-check-label" for="type_new">
+                                    <i class="bi bi-play-circle"></i> New Task
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="task_type" id="type_review" value="review" 
+                                {% if session.current_task %}checked{% endif %}>
+                                <label class="form-check-label" for="type_review">
+                                    <i class="bi bi-search"></i> Review Task
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div id="task-selection" class="mb-3">
+                            <label for="task" class="form-label">Select Task</label>
+                            <select class="form-select" id="task" name="task">
+                                {% if session.current_task %}
+                                <option value="{{ session.current_task }}" selected>{{ session.current_task }}</option>
+                                {% endif %}
+                                
+                                {% if task_status.review %}
+                                <optgroup label="Tasks for Review">
+                                    {% for task in task_status.review %}
+                                    <option value="{{ task }}" {% if session.current_task == task %}selected{% endif %}>{{ task }}</option>
+                                    {% endfor %}
+                                </optgroup>
+                                {% endif %}
+                                
+                                {% if task_status.pending %}
+                                <optgroup label="Pending Tasks">
+                                    {% for task in task_status.pending %}
+                                    <option value="{{ task }}">{{ task }}</option>
+                                    {% endfor %}
+                                </optgroup>
+                                {% endif %}
+                                
+                                <option value="">-- Auto-select next task --</option>
+                            </select>
+                            <div class="form-text">Choose a specific task or let the system select the next task automatically.</div>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-lightning"></i> Generate Prompt
+                            </button>
+                            <a href="{{ url_for('tasks', session_id=session.session_id) }}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left"></i> Back to Tasks
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const typeNew = document.getElementById('type_new');
+        const typeReview = document.getElementById('type_review');
+        const taskSelect = document.getElementById('task');
+        
+        function updateTaskOptions() {
+            // Get all option groups
+            const optgroups = taskSelect.querySelectorAll('optgroup');
+            
+            if (typeReview.checked) {
+                // Show only review tasks
+                optgroups.forEach(group => {
+                    if (group.label === 'Tasks for Review') {
+                        group.style.display = '';
+                    } else {
+                        group.style.display = 'none';
+                    }
+                });
+            } else {
+                // Show only pending tasks
+                optgroups.forEach(group => {
+                    if (group.label === 'Pending Tasks') {
+                        group.style.display = '';
+                    } else {
+                        group.style.display = 'none';
+                    }
+                });
+            }
+        }
+        
+        typeNew.addEventListener('change', updateTaskOptions);
+        typeReview.addEventListener('change', updateTaskOptions);
+        
+        // Initial update
+        updateTaskOptions();
+    });
+</script>
+{% endblock %}
+{% endblock %}

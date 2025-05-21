@@ -1,0 +1,159 @@
+/* Custom styles for Claude Agent web interface */
+
+.task-list {
+    list-style-type: none;
+    padding-left: 0;
+}
+
+.task-item {
+    padding: 10px 15px;
+    margin-bottom: 8px;
+    border-radius: 4px;
+    border-left: 4px solid #ccc;
+}
+
+.task-pending {
+    border-left-color: #007bff;
+    background-color: #f8f9fa;
+}
+
+.task-review {
+    border-left-color: #6c757d;
+    background-color: #f8f9fa;
+}
+
+.task-completed {
+    border-left-color: #28a745;
+    background-color: #f8f9fa;
+    text-decoration: line-through;
+    color: #6c757d;
+}
+
+.session-card {
+    transition: transform 0.2s;
+}
+
+.session-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.session-active {
+    border-left: 4px solid #28a745;
+}
+
+.session-completed {
+    border-left: 4px solid #6c757d;
+}
+
+.logs-container {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.prompt-container {
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    padding: 15px;
+    border: 1px solid #dee2e6;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.copy-button {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+}
+
+.navbar-brand {
+    font-weight: bold;
+}
+
+/* Dashboard stats */
+.stat-card {
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+    background: #fff;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+}
+
+.stat-card .icon {
+    font-size: 2rem;
+    color: #007bff;
+}
+
+.stat-card .count {
+    font-size: 2rem;
+    font-weight: bold;
+}
+
+.stat-card .label {
+    color: #6c757d;
+}
+
+/* Timeline for logs */
+.timeline {
+    position: relative;
+    padding-left: 40px;
+}
+
+.timeline:before {
+    content: '';
+    position: absolute;
+    left: 10px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #dee2e6;
+}
+
+.log-entry {
+    position: relative;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: white;
+    border-radius: 5px;
+    border-left: 4px solid #ccc;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.log-entry:before {
+    content: '';
+    position: absolute;
+    left: -44px;
+    top: 20px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #007bff;
+    border: 2px solid white;
+}
+
+.log-task-start:before {
+    background: #007bff;
+}
+
+.log-task-end:before {
+    background: #28a745;
+}
+
+.log-error:before {
+    background: #dc3545;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .prompt-container {
+        max-height: 300px;
+    }
+    
+    .logs-container {
+        max-height: 300px;
+    }
+}
