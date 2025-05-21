@@ -1,0 +1,162 @@
+{% extends "layout.html" %}
+
+{% block title %}Session Overview{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-info-circle"></i> Session Overview
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5><i class="bi bi-folder"></i> Session Details</h5>
+                            <table class="table table-sm">
+                                <tbody>
+                                    <tr>
+                                        <th>Session ID:</th>
+                                        <td><code>{{ session.session_id }}</code></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Repository:</th>
+                                        <td><code>{{ session.repo_path }}</code></td>
+                                    </tr>
+                                    <tr>
+                                        <th>TODO File:</th>
+                                        <td><code>{{ session.todo_file }}</code></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Created:</th>
+                                        <td>{{ session.created_at|replace('T', ' ')|truncate(19, True, '') }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Status:</th>
+                                        <td>
+                                            {% if session.status == 'active' %}
+                                                <span class="badge bg-success">Active</span>
+                                            {% elif session.status == 'completed' %}
+                                                <span class="badge bg-secondary">Completed</span>
+                                            {% else %}
+                                                <span class="badge bg-warning text-dark">{{ session.status|title }}</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h5><i class="bi bi-list-check"></i> Task Summary</h5>
+                            {% if task_status %}
+                                <div class="d-flex justify-content-between mb-3">
+                                    <div class="text-center p-3 bg-light rounded">
+                                        <h3 class="text-primary">{{ task_status.pending|length }}</h3>
+                                        <div>Pending</div>
+                                    </div>
+                                    <div class="text-center p-3 bg-light rounded">
+                                        <h3 class="text-secondary">{{ task_status.review|length }}</h3>
+                                        <div>For Review</div>
+                                    </div>
+                                    <div class="text-center p-3 bg-light rounded">
+                                        <h3 class="text-success">{{ task_status.completed|length }}</h3>
+                                        <div>Completed</div>
+                                    </div>
+                                </div>
+                                
+                                {% if session.current_task %}
+                                <div class="alert alert-info">
+                                    <i class="bi bi-arrow-right-circle"></i> Current task: <strong>{{ session.current_task }}</strong>
+                                </div>
+                                {% endif %}
+
+                                <div class="d-grid gap-2">
+                                    <a href="{{ url_for('prompt', session_id=session.session_id) }}" class="btn btn-primary">
+                                        <i class="bi bi-chat-dots"></i> Generate Next Prompt
+                                    </a>
+                                    <a href="{{ url_for('tasks', session_id=session.session_id) }}" class="btn btn-outline-secondary">
+                                        <i class="bi bi-list-check"></i> View All Tasks
+                                    </a>
+                                </div>
+                            {% else %}
+                                <div class="alert alert-warning">
+                                    <i class="bi bi-exclamation-triangle"></i> Could not load task status. The TODO file may be missing or inaccessible.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-journal-text"></i> Session Activity Log
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if logs %}
+                        <div class="timeline">
+                            {% for log in logs|reverse %}
+                                <div class="log-entry
+                                    {% if log.type == 'task_start' or log.type == 'task_review_start' %}log-task-start
+                                    {% elif log.type == 'task_end' or log.type == 'task_review_end' %}log-task-end
+                                    {% elif log.type == 'error' %}log-error{% endif %}">
+                                    <div class="d-flex justify-content-between">
+                                        <strong>
+                                            {% if log.type == 'session_start' %}
+                                                <i class="bi bi-play-circle"></i> Session Started
+                                            {% elif log.type == 'session_end' %}
+                                                <i class="bi bi-stop-circle"></i> Session Ended
+                                            {% elif log.type == 'task_start' %}
+                                                <i class="bi bi-play"></i> Task Started
+                                            {% elif log.type == 'task_end' %}
+                                                <i class="bi bi-check-circle"></i> Task Completed
+                                            {% elif log.type == 'claude_prompt' %}
+                                                <i class="bi bi-chat-right"></i> Prompt Sent to Claude
+                                            {% elif log.type == 'claude_response' %}
+                                                <i class="bi bi-chat-right-text"></i> Claude Response
+                                            {% elif log.type == 'context_clear' %}
+                                                <i class="bi bi-eraser"></i> Context Cleared
+                                            {% elif log.type == 'error' %}
+                                                <i class="bi bi-exclamation-triangle"></i> Error
+                                            {% else %}
+                                                <i class="bi bi-activity"></i> {{ log.type|replace('_', ' ')|title }}
+                                            {% endif %}
+                                        </strong>
+                                        <small class="text-muted">{{ log.timestamp|replace('T', ' ')|truncate(19, True, '') }}</small>
+                                    </div>
+                                    <div class="mt-2">
+                                        {% if log.task %}
+                                            <div><strong>Task:</strong> {{ log.task }}</div>
+                                        {% endif %}
+                                        
+                                        {% if log.error_message %}
+                                            <div class="text-danger">{{ log.error_message }}</div>
+                                        {% endif %}
+                                        
+                                        {% if log.type == 'session_end' %}
+                                            <div>Completed {{ log.completed_tasks_count }} tasks</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> No activity logs found for this session.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

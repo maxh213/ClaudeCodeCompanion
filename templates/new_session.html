@@ -1,0 +1,47 @@
+{% extends "layout.html" %}
+
+{% block title %}New Session{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-plus-circle"></i> Create New Session
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{{ url_for('new_session') }}">
+                        <div class="mb-3">
+                            <label for="repo_path" class="form-label">Repository Path</label>
+                            <input type="text" class="form-control" id="repo_path" name="repo_path" 
+                                   value="." required
+                                   placeholder="Enter the path to your repository">
+                            <div class="form-text">Absolute or relative path to the repository directory you want to work with.</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="todo_file" class="form-label">TODO File</label>
+                            <input type="text" class="form-control" id="todo_file" name="todo_file" 
+                                   value="TODO.md" required
+                                   placeholder="Enter the path to your TODO.md file">
+                            <div class="form-text">Path to the TODO.md file, relative to the repository root.</div>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-play-circle"></i> Start Session
+                            </button>
+                            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left"></i> Back to Dashboard
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

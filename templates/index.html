@@ -1,0 +1,116 @@
+{% extends "layout.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h1 class="card-title">
+                        <i class="bi bi-robot"></i> Claude Agent Dashboard
+                    </h1>
+                    <p class="card-text">
+                        Manage your Claude workflow sessions from this dashboard. You can create a new session,
+                        view existing sessions, and manage tasks for each session.
+                    </p>
+                    <a href="{{ url_for('new_session') }}" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> Create New Session
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-clock-history"></i> Your Sessions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if sessions %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Session ID</th>
+                                        <th>Repository</th>
+                                        <th>Created</th>
+                                        <th>Status</th>
+                                        <th>Tasks</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for session_id, session_data in sessions.items() %}
+                                    <tr {% if current_session == session_id %}class="table-active"{% endif %}>
+                                        <td>
+                                            <span class="badge bg-dark">{{ session_id }}</span>
+                                        </td>
+                                        <td>
+                                            {% if session_data.repo_path %}
+                                                <code>{{ session_data.repo_path }}</code>
+                                            {% else %}
+                                                <span class="text-muted">Unknown</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if session_data.created_at %}
+                                                {{ session_data.created_at|replace('T', ' ')|truncate(19, True, '') }}
+                                            {% else %}
+                                                <span class="text-muted">Unknown</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if session_data.status == 'active' %}
+                                                <span class="badge bg-success">Active</span>
+                                            {% elif session_data.status == 'completed' %}
+                                                <span class="badge bg-secondary">Completed</span>
+                                            {% else %}
+                                                <span class="badge bg-warning text-dark">{{ session_data.status|title }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if session_data.completed_tasks %}
+                                                <span class="badge bg-success">{{ session_data.completed_tasks|length }} completed</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">0 completed</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="{{ url_for('session', session_id=session_id) }}" class="btn btn-outline-primary">
+                                                    <i class="bi bi-eye"></i> View
+                                                </a>
+                                                {% if session_data.status == 'active' %}
+                                                <a href="{{ url_for('prompt', session_id=session_id) }}" class="btn btn-outline-success">
+                                                    <i class="bi bi-chat-dots"></i> Prompt
+                                                </a>
+                                                <form action="{{ url_for('end_session', session_id=session_id) }}" method="post" class="d-inline">
+                                                    <button type="submit" class="btn btn-outline-danger">
+                                                        <i class="bi bi-box-arrow-right"></i> End
+                                                    </button>
+                                                </form>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> No sessions found. Create a new session to get started.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

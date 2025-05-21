@@ -1,0 +1,102 @@
+{% extends "layout.html" %}
+
+{% block title %}Tasks{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-list-check"></i> Tasks
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-end mb-3">
+                        <a href="{{ url_for('prompt', session_id=session.session_id) }}" class="btn btn-primary">
+                            <i class="bi bi-chat-dots"></i> Generate Next Prompt
+                        </a>
+                    </div>
+                    
+                    {% if task_status %}
+                        {% if session.current_task %}
+                        <div class="alert alert-info mb-4">
+                            <i class="bi bi-arrow-right-circle"></i> Current task: <strong>{{ session.current_task }}</strong>
+                        </div>
+                        {% endif %}
+                        
+                        {% if task_status.review %}
+                        <div class="mb-4">
+                            <h5 class="border-bottom pb-2 mb-3">
+                                <i class="bi bi-search"></i> Tasks for Review
+                            </h5>
+                            <div class="list-group">
+                                {% for task in task_status.review %}
+                                <div class="list-group-item list-group-item-action review-card">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">{{ task }}</h6>
+                                        <a href="{{ url_for('prompt', session_id=session.session_id) }}?task_type=review&task={{ task|urlencode }}" class="btn btn-sm btn-outline-secondary">
+                                            <i class="bi bi-search"></i> Review
+                                        </a>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if task_status.pending %}
+                        <div class="mb-4">
+                            <h5 class="border-bottom pb-2 mb-3">
+                                <i class="bi bi-clock"></i> Pending Tasks
+                            </h5>
+                            <div class="list-group">
+                                {% for task in task_status.pending %}
+                                <div class="list-group-item list-group-item-action task-card">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">{{ task }}</h6>
+                                        <a href="{{ url_for('prompt', session_id=session.session_id) }}?task_type=new&task={{ task|urlencode }}" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-play-circle"></i> Start
+                                        </a>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if task_status.completed %}
+                        <div>
+                            <h5 class="border-bottom pb-2 mb-3">
+                                <i class="bi bi-check-circle"></i> Completed Tasks
+                            </h5>
+                            <div class="list-group">
+                                {% for task in task_status.completed %}
+                                <div class="list-group-item completed-card">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1 text-muted">{{ task }}</h6>
+                                        <span class="badge bg-success">Completed</span>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if not task_status.pending and not task_status.review and not task_status.completed %}
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i> No tasks found in TODO.md file.
+                        </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i> Could not load task status. The TODO file may be missing or inaccessible.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

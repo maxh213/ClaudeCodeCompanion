@@ -295,9 +295,10 @@ def main():
     config = load_config(args)
     session_state = initialize_session(config)
     
-    print(f"\n[Claude Agent] Starting session on branch: {session_state['branch_name']}")
+    print(f"\n[Claude Agent] Starting session: {session_state['session_id']}")
     print(f"[Claude Agent] Working with repository: {config['repo_path']}")
     print(f"[Claude Agent] TODO file: {config['todo_file']}")
+    print(f"[Claude Agent] Claude will manage branches and PRs through the prompt instructions")
     
     # Main loop for processing tasks
     try:
@@ -337,8 +338,7 @@ def main():
     
     # Summary message
     print(f"\n[Claude Agent] Session {session_state['session_id']} completed.")
-    print(f"[Claude Agent] Branch: {session_state['branch_name']}")
-    print(f"[Claude Agent] PR URL: {session_state['pr_url']}")
+    print(f"[Claude Agent] Repository path: {session_state['repo_path']}")
     print(f"[Claude Agent] Completed tasks: {len(session_state['completed_tasks'])}")
     
     return 0
