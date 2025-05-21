@@ -13,19 +13,11 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "ClaudeAgent"
+args = "run_claude_agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "run_claude_agent"
-
-[[workflows.workflow]]
-name = "ClaudeAgent"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python claude_agent.py --repo-path ."
+args = "ClaudeAgent"
 
 [[workflows.workflow]]
 name = "run_claude_agent"
@@ -34,6 +26,14 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python claude_agent.py --help"
+
+[[workflows.workflow]]
+name = "ClaudeAgent"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python claude_agent.py --repo-path ."
 
 [deployment]
 run = ["sh", "-c", "python claude_agent.py --repo-path ."]
