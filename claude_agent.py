@@ -172,162 +172,171 @@ def initialize_session(config):
     return session_state
 
 def run_claude_api(prompt, repo_path, api_key=None):
-    """Run a Claude API request using Claude Code CLI tool."""
+    """Run a Claude API request using Claude Code CLI tool with live streaming output."""
     import subprocess
     import tempfile
     import os
     import json
+    import sys
+    from datetime import datetime
     
     print(f"\n[Claude Agent] Working on task in {repo_path}...")
+    print("[Claude Agent] Using Claude Code CLI with live streaming...")
     
-    # First, check if Claude Code is installed
-    try:
-        # Check if claude command is available
-        result = subprocess.run(['claude', '--version'], 
-                             capture_output=True, 
-                             text=True, 
-                             check=False)
-        
-        if result.returncode == 0:
-            claude_code_available = True
-            print("[Claude Agent] Claude Code detected. Using Claude Code CLI...")
-        else:
-            claude_code_available = False
-            print("[Claude Agent] Claude Code not found. Falling back to manual mode...")
-    except FileNotFoundError:
-        claude_code_available = False
-        print("[Claude Agent] Claude Code not installed. Falling back to manual mode...")
+    # Create a temporary file for the prompt
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as temp_file:
+        temp_file_path = temp_file.name
+        temp_file.write(prompt)
     
-    # Use Claude Code if available
-    if claude_code_available:
-        try:
-            # Save prompt to temporary file
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as temp_file:
-                temp_file_path = temp_file.name
-                temp_file.write(prompt)
-            
-            # Run Claude Code in print mode with json output format for automation
-            print("[Claude Agent] Running Claude Code CLI...")
-            cmd = ['claude', '-p', '--output-format', 'json', '--max-turns', '5']
-            
-            # Add the prompt (reading from file to handle large prompts better)
-            with open(temp_file_path, 'r') as f:
-                prompt_text = f.read()
-            
-            # Run Claude Code with the prompt
-            proc = subprocess.run(
-                cmd,
-                input=prompt_text,
-                capture_output=True,
-                text=True,
-                cwd=repo_path
-            )
-            
-            if proc.returncode == 0:
-                try:
-                    # Parse the JSON output
-                    output = json.loads(proc.stdout)
-                    response = output.get('result', '')
-                    
-                    print("[Claude Agent] Claude Code execution successful")
-                    print(f"[Claude Agent] Response length: {len(response)} characters")
-                    
-                    # Save the response for reference
-                    response_file = Path(repo_path) / "claude_response.txt"
-                    with open(response_file, 'w') as f:
-                        f.write(response)
-                    print(f"[Claude Agent] Saved Claude's response to {response_file}")
-                    
-                    return response
-                except json.JSONDecodeError:
-                    print("[Claude Agent] Error parsing Claude Code output as JSON")
-                    print("[Claude Agent] Falling back to raw output...")
-                    response = proc.stdout
-                    return response
-            else:
-                print(f"[Claude Agent] Claude Code execution failed with exit code {proc.returncode}")
-                print(f"[Claude Agent] Error: {proc.stderr}")
-                print("[Claude Agent] Falling back to manual mode...")
-        except Exception as e:
-            print(f"[Claude Agent] Error running Claude Code: {str(e)}")
-            print("[Claude Agent] Falling back to manual mode...")
-        finally:
-            # Clean up temp file
-            try:
-                os.unlink(temp_file_path)
-            except:
-                pass
-    
-    # If we have API key, try using Anthropic package 
-    if api_key and not claude_code_available:
-        try:
-            print("[Claude Agent] Trying to use Anthropic API...")
-            
-            # Import dynamically only if needed
-            import anthropic
-            
-            # The newest Anthropic model is "claude-3-5-sonnet-20241022" which was released October 22, 2024
-            client = anthropic.Anthropic(api_key=api_key)
-            
-            message = client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=4000,
-                temperature=0.2,
-                system="You are an expert programmer assisting with coding tasks. Follow instructions precisely.",
-                messages=[{"role": "user", "content": prompt}]
-            )
-            
-            response = message.content[0].text
-            
-            print("[Claude Agent] Successfully received response from Claude API")
-            print(f"[Claude Agent] Response length: {len(response)} characters")
-            
-            return response
-            
-        except Exception as e:
-            print(f"[Claude Agent] Error using Anthropic API: {str(e)}")
-            print("[Claude Agent] Falling back to manual mode...")
-    
-    # Manual fallback mode if all else fails
-    # Save the prompt to a file for convenience
+    # Save the prompt for reference
     prompt_file = Path(repo_path) / "claude_prompt.txt"
     try:
         with open(prompt_file, 'w') as f:
             f.write(prompt)
-        print(f"[Claude Agent] Saved prompt to {prompt_file}")
+        print(f"[Claude Agent] Saved prompt to: {prompt_file}")
     except Exception as e:
-        print(f"[Claude Agent] Warning: Could not save prompt to file: {e}")
+        print(f"[Claude Agent] Warning: Could not save prompt file: {e}")
     
-    print("\n" + "="*80)
-    print("PROMPT FOR CLAUDE:")
-    print("="*80)
-    print(prompt)
-    print("="*80 + "\n")
+    start_time = datetime.now()
+    print(f"[Claude Agent] Started at: {start_time.strftime('%H:%M:%S')}")
     
-    print("[Claude Agent] Please use Claude Code or copy this prompt to Claude.")
-    print("[Claude Agent] Then paste Claude's response below.")
-    print("[Claude Agent] Type 'DONE' on a new line when finished.")
-    
-    # Collect user input until they indicate they're done
-    lines = []
-    while True:
-        line = input()
-        if line.strip() == "DONE":
-            break
-        lines.append(line)
-    
-    response = "\n".join(lines)
-    
-    # Save the response for reference
     try:
+        # Using stream-json format for real-time streaming output
+        # This will show the output as it's being generated
+        print("[Claude Agent] Starting Claude Code in streaming mode...")
+        
+        # Command for streaming mode using 'stream-json' format
+        # Based on Claude Code documentation for streaming JSON output
+        cmd = ['claude', '-p', '--output-format', 'stream-json', '--verbose', '--max-turns', '10']
+        
+        # Prepare the input content
+        with open(temp_file_path, 'r') as f:
+            prompt_text = f.read()
+        
+        # Start the process with Popen to capture real-time output
+        print("[Claude Agent] Executing claude command with live streaming...")
+        print("\n" + "="*80)
+        print("[Claude Agent] STREAMING OUTPUT BEGIN")
+        print("="*80)
+        
+        # Create file to collect the entire output
+        full_output = []
+        final_result = ""
+        
+        # Use Popen to get real-time output
+        process = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            cwd=repo_path,
+            bufsize=1  # Line buffered
+        )
+        
+        # Send the prompt to the process
+        process.stdin.write(prompt_text)
+        process.stdin.close()
+        
+        # Process output line by line as it comes in
+        for line in process.stdout:
+            # Print the line to show streaming output
+            print(line, end='', flush=True)
+            
+            # Collect the line for later processing
+            full_output.append(line)
+            
+            # Try to parse as JSON to extract assistant messages
+            try:
+                obj = json.loads(line)
+                # Look for assistant content as it streams in
+                if isinstance(obj, dict) and obj.get('role') == 'assistant' and 'content' in obj:
+                    content = obj['content']
+                    if content:
+                        sys.stdout.write("\033[34m")  # Blue text for Claude's responses
+                        print(f"CLAUDE: {content}")
+                        sys.stdout.write("\033[0m")  # Reset color
+                
+                # Check for final system message with stats
+                if isinstance(obj, dict) and obj.get('role') == 'system':
+                    if 'result' in obj:
+                        final_result = obj['result']
+                    if 'cost_usd' in obj:
+                        print(f"[Claude Agent] Cost: ${obj['cost_usd']:.5f}")
+                    if 'duration_ms' in obj:
+                        print(f"[Claude Agent] Duration: {obj['duration_ms']/1000:.2f} seconds")
+            except json.JSONDecodeError:
+                # Not valid JSON, might be progress indicator or other output
+                pass
+        
+        # Check stderr for any errors
+        stderr_output = process.stderr.read()
+        if stderr_output:
+            print(f"[Claude Agent] STDERR: {stderr_output}")
+        
+        # Get process return code
+        return_code = process.wait()
+        
+        print("="*80)
+        print("[Claude Agent] STREAMING OUTPUT END")
+        print("="*80 + "\n")
+        
+        end_time = datetime.now()
+        elapsed = (end_time - start_time).total_seconds()
+        print(f"[Claude Agent] Completed at: {end_time.strftime('%H:%M:%S')} (took {elapsed:.2f} seconds)")
+        
+        # If we didn't get a result from the JSON parsing, try to reconstruct it
+        if not final_result and full_output:
+            # Combine everything as raw output
+            raw_output = ''.join(full_output)
+            
+            # Try to find and parse the final system message JSON object
+            output_lines = raw_output.strip().split('\n')
+            for line in reversed(output_lines):
+                try:
+                    obj = json.loads(line)
+                    if isinstance(obj, dict) and obj.get('role') == 'system' and 'result' in obj:
+                        final_result = obj['result']
+                        break
+                except:
+                    continue
+        
+        # If we still don't have a result, use the whole output
+        if not final_result:
+            print("[Claude Agent] Warning: Could not extract final result, using raw output")
+            final_result = ''.join(full_output)
+        
+        # Save the response for reference
         response_file = Path(repo_path) / "claude_response.txt"
-        with open(response_file, 'w') as f:
-            f.write(response)
-        print(f"[Claude Agent] Saved Claude's response to {response_file}")
+        try:
+            with open(response_file, 'w') as f:
+                f.write(final_result)
+            print(f"[Claude Agent] Saved response to: {response_file}")
+        except Exception as e:
+            print(f"[Claude Agent] Warning: Could not save response: {e}")
+        
+        return final_result
+        
+    except FileNotFoundError:
+        error_message = (
+            "ERROR: Claude Code CLI not found. Please install Claude Code using:\n\n"
+            "npm install -g @anthropic-ai/claude-code\n\n"
+            "Then authenticate by running 'claude' and follow the instructions to log in."
+        )
+        print(f"[Claude Agent] {error_message}")
+        return error_message
+        
     except Exception as e:
-        print(f"[Claude Agent] Warning: Could not save response to file: {e}")
-    
-    return response
+        error_message = f"ERROR: Failed to execute Claude Code: {str(e)}"
+        print(f"[Claude Agent] {error_message}")
+        return error_message
+        
+    finally:
+        # Clean up the temporary file
+        try:
+            os.unlink(temp_file_path)
+        except:
+            pass
 
 def run_claude_interaction(config, session_state, is_review=False):
     """Run a single Claude interaction for a task or review."""
@@ -427,7 +436,7 @@ def main():
     print(f"[Claude Agent] Working with repository: {config['repo_path']}")
     print(f"[Claude Agent] TODO file: {config['todo_file']}")
     print(f"[Claude Agent] Using GitHub CLI: {config.get('use_gh_cli', False)}")
-    print(f"[Claude Agent] Claude will manage branches and PRs through the prompt instructions")
+    print(f"[Claude Agent] Using Claude Code in streaming mode for live updates")
     print(f"[Claude Agent] Autonomous mode: Tasks will automatically continue without user confirmation")
     
     # Main loop for processing tasks
@@ -442,14 +451,19 @@ def main():
                 logging.info("All tasks are completed in TODO.md. Ending session.")
                 print("\n[Claude Agent] All tasks are completed in TODO.md. Ending session.")
                 break
+            
+            # Get date/time for this iteration
+            from datetime import datetime
+            now = datetime.now()
+            print(f"\n[Claude Agent] Task iteration started at: {now.strftime('%Y-%m-%d %H:%M:%S')}")
                 
             # If previous task is complete, start a new task; otherwise, review previous task
             if task_complete:
-                print("\n[Claude Agent] Working on a new task...")
+                print("\n[Claude Agent] Working on a new task with Claude Code...")
                 task_complete = run_claude_interaction(config, session_state, is_review=False)
             else:
                 # This is a review step
-                print("\n[Claude Agent] Reviewing the previously implemented task...")
+                print("\n[Claude Agent] Reviewing the previously implemented task with Claude Code...")
                 run_claude_interaction(config, session_state, is_review=True)
                 task_complete = True  # After review, mark as complete and move to next task
             
@@ -458,6 +472,31 @@ def main():
             print("[Claude Agent] CONTEXT CLEARED!")
             print("[Claude Agent] Claude's context has been cleared. Next iteration will be a fresh interaction.")
             print("="*80 + "\n")
+            
+            # Task summary
+            todo_path = Path(config['repo_path']) / config['todo_file']
+            try:
+                if todo_path.exists():
+                    # Count tasks in different states for summary
+                    todo_content = read_file(todo_path)
+                    pending_count = todo_content.count("[ ]")
+                    review_count = todo_content.count("[R]")
+                    completed_count = todo_content.count("[x]") + todo_content.count("[X]")
+                    total_count = pending_count + review_count + completed_count
+                    
+                    # Calculate completion percentage
+                    if total_count > 0:
+                        completion_pct = (completed_count / total_count) * 100
+                    else:
+                        completion_pct = 0
+                    
+                    print(f"[Claude Agent] TODO Summary:")
+                    print(f"  - Pending: {pending_count}")
+                    print(f"  - For Review: {review_count}")
+                    print(f"  - Completed: {completed_count}")
+                    print(f"  - Overall Completion: {completion_pct:.1f}%")
+            except Exception as e:
+                print(f"[Claude Agent] Could not read TODO file for summary: {e}")
             
             # In automatic mode, we don't ask for confirmation
             if not auto_mode:
@@ -469,8 +508,17 @@ def main():
                     break
             else:
                 # In automatic mode, add a brief delay between tasks
-                print("[Claude Agent] Continuing to next task automatically in 3 seconds...")
-                time.sleep(3)
+                delay_seconds = 5
+                print(f"[Claude Agent] Continuing to next task automatically in {delay_seconds} seconds...")
+                print("[Claude Agent] Press Ctrl+C to interrupt if needed.")
+                
+                # Allow interruption during delay
+                try:
+                    time.sleep(delay_seconds)
+                except KeyboardInterrupt:
+                    print("\n[Claude Agent] Interrupted by user during delay.")
+                    logging.info("Session interrupted by user during delay")
+                    break
     
     except KeyboardInterrupt:
         logging.info("Session interrupted by user")
@@ -480,10 +528,48 @@ def main():
         print(f"\n[Claude Agent] Error in main loop: {e}")
     
     # Summary message
-    print(f"\n[Claude Agent] Session {session_state['session_id']} completed.")
-    print(f"[Claude Agent] Repository path: {session_state['repo_path']}")
-    print(f"[Claude Agent] Completed tasks: {len(session_state['completed_tasks'])}")
+    print("\n" + "="*80)
+    print(f"[Claude Agent] SESSION SUMMARY")
+    print("="*80)
+    print(f"Session ID: {session_state['session_id']}")
+    print(f"Repository path: {session_state['repo_path']}")
+    print(f"Completed tasks: {len(session_state['completed_tasks'])}")
     
+    # List completed tasks
+    if session_state['completed_tasks']:
+        print("\nCompleted tasks:")
+        for i, task in enumerate(session_state['completed_tasks'], 1):
+            print(f"  {i}. {task}")
+    
+    # Final TODO summary
+    todo_path = Path(config['repo_path']) / config['todo_file']
+    try:
+        if todo_path.exists():
+            # Count tasks in different states for final summary
+            todo_content = read_file(todo_path)
+            pending_count = todo_content.count("[ ]")
+            review_count = todo_content.count("[R]")
+            completed_count = todo_content.count("[x]") + todo_content.count("[X]")
+            total_count = pending_count + review_count + completed_count
+            
+            # Calculate completion percentage
+            if total_count > 0:
+                completion_pct = (completed_count / total_count) * 100
+            else:
+                completion_pct = 0
+            
+            print(f"\nFinal TODO Status:")
+            print(f"  - Tasks Pending: {pending_count}")
+            print(f"  - Tasks For Review: {review_count}")
+            print(f"  - Tasks Completed: {completed_count}")
+            print(f"  - Overall Completion: {completion_pct:.1f}%")
+            
+            if pending_count == 0 and review_count == 0 and completed_count > 0:
+                print("\n🎉 All tasks completed successfully! 🎉")
+    except Exception as e:
+        print(f"Could not read TODO file for final summary: {e}")
+    
+    print("="*80 + "\n")
     return 0
 
 if __name__ == "__main__":
