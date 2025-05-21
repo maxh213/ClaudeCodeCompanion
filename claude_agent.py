@@ -402,6 +402,20 @@ def run_claude_api(prompt, repo_path, api_key=None):
         if not final_result:
             print("[Claude Agent] Warning: Could not extract final result from JSON, using raw output")
             final_result = ''.join(full_output)
+            
+        # Look for completion signal in the final result
+        if "CLAUDE_TASK_COMPLETE" in final_result:
+            print("\n🏁 [Claude Agent] Task completion signal detected!")
+            
+            # Extract everything before the completion signal for cleaner result
+            completion_marker = "CLAUDE_TASK_COMPLETE"
+            if completion_marker in final_result:
+                signal_index = final_result.find(completion_marker)
+                if signal_index > 0:
+                    final_result = final_result[:signal_index].strip()
+                    print("[Claude Agent] Cleaned up final result, removing completion signal")
+        else:
+            print("\n⚠️ [Claude Agent] No task completion signal found. Task may not be fully complete.")
         
         # Save the response for reference
         response_file = Path(repo_path) / "claude_response.txt"

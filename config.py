@@ -52,6 +52,7 @@ Follow these steps precisely:
 
 7. Stop:
    Do not continue. Await human review before proceeding.
+   Always end your response with the exact phrase "CLAUDE_TASK_COMPLETE" when you have finished working on this task.
 """
 
 # Review prompt template based on the PRD
@@ -78,6 +79,9 @@ REVIEW_PROMPT_TEMPLATE = """You are continuing the previously completed task tha
 
 6. Clear State:
    Set `.claude/state.json` to {{}} to allow new task in next session.
+   
+7. Signal Completion:
+   Always end your response with the exact phrase "CLAUDE_TASK_COMPLETE" when you have finished the review.
 """
 
 # Empty TODO list template
