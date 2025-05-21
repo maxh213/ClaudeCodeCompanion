@@ -42,14 +42,12 @@ Follow these steps precisely:
 
 6. Commit Work:
    Commit your changes with: `feat: Implement [task summary]`.
-   Update `.claude/state.json` with task and branch info:
-   ```json
+   Update `.claude/state.json` with task and branch info with the following structure:
    {
      "last_task": "Task description",
      "last_branch": "feature/branch-name",
      "status": "awaiting_review"
    }
-   ```
 
 7. Stop:
    Do not continue. Await human review before proceeding.
