@@ -1,0 +1,254 @@
+{% extends "layout.html" %}
+
+{% block title %}Conversation History{% endblock %}
+
+{% block styles %}
+<style>
+    .message-user {
+        background-color: #f8f9fa;
+        border-left: 4px solid #007bff;
+    }
+    
+    .message-assistant {
+        background-color: #f0f9ff;
+        border-left: 4px solid #28a745;
+    }
+    
+    .message-system {
+        background-color: #fffcf4;
+        border-left: 4px solid #6c757d;
+    }
+    
+    .message-container {
+        max-height: 600px;
+        overflow-y: auto;
+    }
+    
+    .conversation-item {
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    
+    .conversation-item:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .conversation-item.active {
+        background-color: #e9ecef;
+        border-left: 3px solid #007bff;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-3">
+            <div class="card mb-4">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-chat-square-text"></i> Conversations
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        {% if conversations %}
+                            {% for conv in conversations %}
+                                <a href="{{ url_for('view_conversation', session_id=session.session_id, conversation_id=conv.conversation_id) }}" 
+                                  class="list-group-item list-group-item-action conversation-item {% if conversation and conversation.conversation_id == conv.conversation_id %}active{% endif %}">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">
+                                            {% if conv.task_type == 'review' %}
+                                                <i class="bi bi-search"></i> Review
+                                            {% else %}
+                                                <i class="bi bi-play-circle"></i> Implementation
+                                            {% endif %}
+                                        </h6>
+                                        <small class="text-muted">{{ conv.started_at|replace('T', ' ')|truncate(16, True, '') }}</small>
+                                    </div>
+                                    <p class="mb-1 small text-truncate">
+                                        {% if conv.task %}
+                                            {{ conv.task }}
+                                        {% else %}
+                                            <span class="text-muted">No task specified</span>
+                                        {% endif %}
+                                    </p>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <small>
+                                            {{ conv.messages|length }} message{% if conv.messages|length != 1 %}s{% endif %}
+                                        </small>
+                                        <span class="badge {% if conv.status == 'completed' %}bg-success{% elif conv.status == 'failed' %}bg-danger{% else %}bg-secondary{% endif %}">
+                                            {{ conv.status|title }}
+                                        </span>
+                                    </div>
+                                </a>
+                            {% endfor %}
+                        {% else %}
+                            <div class="list-group-item text-center text-muted">
+                                <i class="bi bi-exclamation-circle"></i> No conversations found
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <a href="{{ url_for('prompt', session_id=session.session_id) }}" class="btn btn-primary btn-sm w-100">
+                        <i class="bi bi-plus-circle"></i> New Conversation
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-9">
+            <div class="card">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        {% if conversation %}
+                            <i class="bi bi-chat-text"></i> 
+                            {% if conversation.task_type == 'review' %}
+                                Review Conversation
+                            {% else %}
+                                Implementation Conversation
+                            {% endif %}
+                        {% else %}
+                            <i class="bi bi-chat"></i> Conversation
+                        {% endif %}
+                    </h5>
+                    {% if conversation %}
+                        <div>
+                            <span class="badge {% if conversation.status == 'completed' %}bg-success{% elif conversation.status == 'failed' %}bg-danger{% else %}bg-secondary{% endif %}">
+                                {{ conversation.status|title }}
+                            </span>
+                            <small class="text-light ms-2">
+                                Started: {{ conversation.started_at|replace('T', ' ')|truncate(16, True, '') }}
+                            </small>
+                            {% if conversation.ended_at %}
+                                <small class="text-light ms-2">
+                                    Ended: {{ conversation.ended_at|replace('T', ' ')|truncate(16, True, '') }}
+                                </small>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if conversation %}
+                        {% if conversation.task %}
+                            <div class="alert alert-info mb-4">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-info-circle fs-4 me-2"></i>
+                                    <div>
+                                        <strong>Task:</strong> {{ conversation.task }}
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+                        
+                        <div class="message-container mb-4">
+                            {% if conversation.messages %}
+                                {% for message in conversation.messages %}
+                                    <div class="card mb-3 message-{{ message.role }}">
+                                        <div class="card-header d-flex justify-content-between align-items-center">
+                                            <strong>
+                                                {% if message.role == 'user' %}
+                                                    <i class="bi bi-person-circle"></i> User
+                                                {% elif message.role == 'assistant' %}
+                                                    <i class="bi bi-robot"></i> Assistant
+                                                {% elif message.role == 'system' %}
+                                                    <i class="bi bi-gear"></i> System
+                                                {% endif %}
+                                            </strong>
+                                            <small class="text-muted">{{ message.timestamp|replace('T', ' ')|truncate(19, True, '') }}</small>
+                                        </div>
+                                        <div class="card-body">
+                                            {% if message.metadata and message.metadata.format == 'code' %}
+                                                <pre><code>{{ message.content }}</code></pre>
+                                            {% elif message.metadata and message.metadata.format == 'markdown' %}
+                                                <div class="markdown-content">{{ message.content }}</div>
+                                            {% else %}
+                                                <p class="card-text" style="white-space: pre-wrap;">{{ message.content }}</p>
+                                            {% endif %}
+                                            
+                                            {% if message.metadata %}
+                                                {% if message.metadata.model %}
+                                                    <div class="mt-2">
+                                                        <small class="text-muted">
+                                                            <i class="bi bi-cpu"></i> Model: {{ message.metadata.model }}
+                                                        </small>
+                                                    </div>
+                                                {% endif %}
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="text-center text-muted my-5">
+                                    <i class="bi bi-chat-square"></i> No messages in this conversation
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        {% if conversation.status == 'active' %}
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Add Message</h6>
+                                </div>
+                                <div class="card-body">
+                                    <form action="{{ url_for('add_conversation_message', session_id=session.session_id, conversation_id=conversation.conversation_id) }}" method="post">
+                                        <div class="mb-3">
+                                            <label for="role" class="form-label">Role</label>
+                                            <select class="form-select" id="role" name="role">
+                                                <option value="user">User</option>
+                                                <option value="assistant">Assistant</option>
+                                                <option value="system">System</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="content" class="form-label">Message</label>
+                                            <textarea class="form-control" id="content" name="content" rows="5" required></textarea>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="format" class="form-label">Format</label>
+                                            <select class="form-select" id="format" name="format">
+                                                <option value="text">Text</option>
+                                                <option value="code">Code</option>
+                                                <option value="markdown">Markdown</option>
+                                            </select>
+                                        </div>
+                                        <div class="d-grid gap-2">
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="bi bi-send"></i> Add Message
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-center mt-4">
+                                <form action="{{ url_for('end_conversation', session_id=session.session_id, conversation_id=conversation.conversation_id) }}" method="post" class="me-2">
+                                    <input type="hidden" name="status" value="completed">
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="bi bi-check-circle"></i> Complete Conversation
+                                    </button>
+                                </form>
+                                <form action="{{ url_for('end_conversation', session_id=session.session_id, conversation_id=conversation.conversation_id) }}" method="post">
+                                    <input type="hidden" name="status" value="failed">
+                                    <button type="submit" class="btn btn-danger">
+                                        <i class="bi bi-x-circle"></i> Mark as Failed
+                                    </button>
+                                </form>
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center text-muted my-5">
+                            <i class="bi bi-chat-square"></i>
+                            <p>Select a conversation from the list or create a new one</p>
+                            <a href="{{ url_for('prompt', session_id=session.session_id) }}" class="btn btn-primary">
+                                <i class="bi bi-plus-circle"></i> New Conversation
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

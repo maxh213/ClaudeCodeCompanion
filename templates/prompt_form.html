@@ -23,14 +23,15 @@
                         <div class="mb-3">
                             <label class="form-label">Prompt Type</label>
                             <div class="form-check">
-                                <input class="form-check-input" type="radio" name="task_type" id="type_new" value="new" checked>
+                                <input class="form-check-input" type="radio" name="task_type" id="type_new" value="new" 
+                                {% if selected_task_type != 'review' %}checked{% endif %}>
                                 <label class="form-check-label" for="type_new">
                                     <i class="bi bi-play-circle"></i> New Task
                                 </label>
                             </div>
                             <div class="form-check">
                                 <input class="form-check-input" type="radio" name="task_type" id="type_review" value="review" 
-                                {% if session.current_task %}checked{% endif %}>
+                                {% if selected_task_type == 'review' or session.current_task %}checked{% endif %}>
                                 <label class="form-check-label" for="type_review">
                                     <i class="bi bi-search"></i> Review Task
                                 </label>
@@ -40,14 +41,16 @@
                         <div id="task-selection" class="mb-3">
                             <label for="task" class="form-label">Select Task</label>
                             <select class="form-select" id="task" name="task">
-                                {% if session.current_task %}
+                                {% if selected_task %}
+                                <option value="{{ selected_task }}" selected>{{ selected_task }}</option>
+                                {% elif session.current_task %}
                                 <option value="{{ session.current_task }}" selected>{{ session.current_task }}</option>
                                 {% endif %}
                                 
                                 {% if task_status.review %}
                                 <optgroup label="Tasks for Review">
                                     {% for task in task_status.review %}
-                                    <option value="{{ task }}" {% if session.current_task == task %}selected{% endif %}>{{ task }}</option>
+                                    <option value="{{ task }}" {% if session.current_task == task or selected_task == task %}selected{% endif %}>{{ task }}</option>
                                     {% endfor %}
                                 </optgroup>
                                 {% endif %}
@@ -55,7 +58,7 @@
                                 {% if task_status.pending %}
                                 <optgroup label="Pending Tasks">
                                     {% for task in task_status.pending %}
-                                    <option value="{{ task }}">{{ task }}</option>
+                                    <option value="{{ task }}" {% if selected_task == task %}selected{% endif %}>{{ task }}</option>
                                     {% endfor %}
                                 </optgroup>
                                 {% endif %}
@@ -65,13 +68,44 @@
                             <div class="form-text">Choose a specific task or let the system select the next task automatically.</div>
                         </div>
                         
+                        {% if ollama_enabled %}
+                        <div class="mb-3">
+                            <div class="card">
+                                <div class="card-header bg-info text-white">
+                                    <h6 class="mb-0">
+                                        <i class="bi bi-cpu"></i> Ollama Integration
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="use_ollama" name="use_ollama">
+                                        <label class="form-check-label" for="use_ollama">
+                                            Use Ollama to process this task
+                                        </label>
+                                    </div>
+                                    <div class="form-text">
+                                        When enabled, Ollama will automatically generate a response using the selected LLM model.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
                         <div class="d-grid gap-2">
                             <button type="submit" class="btn btn-primary">
                                 <i class="bi bi-lightning"></i> Generate Prompt
                             </button>
-                            <a href="{{ url_for('tasks', session_id=session.session_id) }}" class="btn btn-outline-secondary">
-                                <i class="bi bi-arrow-left"></i> Back to Tasks
-                            </a>
+                            <div class="btn-group">
+                                <a href="{{ url_for('tasks', session_id=session.session_id) }}" class="btn btn-outline-secondary">
+                                    <i class="bi bi-list-check"></i> Tasks
+                                </a>
+                                <a href="{{ url_for('todo_preview', session_id=session.session_id) }}" class="btn btn-outline-secondary">
+                                    <i class="bi bi-file-earmark-text"></i> TODO Preview
+                                </a>
+                                <a href="{{ url_for('conversations', session_id=session.session_id) }}" class="btn btn-outline-secondary">
+                                    <i class="bi bi-chat-text"></i> Conversations
+                                </a>
+                            </div>
                         </div>
                     </form>
                 </div>

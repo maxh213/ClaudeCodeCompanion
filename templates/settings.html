@@ -1,0 +1,159 @@
+{% extends "layout.html" %}
+
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-gear"></i> Settings
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{{ url_for('settings') }}">
+                        <h5 class="border-bottom pb-2 mb-3">Ollama Integration</h5>
+                        
+                        <div class="mb-3">
+                            <label for="ollama_enabled" class="form-label">Enable Ollama Integration</label>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="ollama_enabled" name="ollama_enabled" 
+                                       {% if settings.ollama_enabled %}checked{% endif %}>
+                                <label class="form-check-label" for="ollama_enabled">
+                                    Use Ollama to handle Claude Agent tasks
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div id="ollama-settings" {% if not settings.ollama_enabled %}style="display: none;"{% endif %}>
+                            <div class="mb-3">
+                                <label for="ollama_base_url" class="form-label">Ollama API URL</label>
+                                <input type="text" class="form-control" id="ollama_base_url" name="ollama_base_url" 
+                                       value="{{ settings.ollama_base_url or 'http://localhost:11434' }}"
+                                       placeholder="http://localhost:11434">
+                                <div class="form-text">URL for your Ollama API server</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="ollama_model" class="form-label">Default Ollama Model</label>
+                                <input type="text" class="form-control" id="ollama_model" name="ollama_model" 
+                                       value="{{ settings.ollama_model or 'llama3' }}"
+                                       placeholder="llama3">
+                                <div class="form-text">Default model to use with Ollama</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="ollama_temperature" class="form-label">Temperature: <span id="temp-value">{{ settings.ollama_temperature or '0.7' }}</span></label>
+                                <input type="range" class="form-range" id="ollama_temperature" name="ollama_temperature" 
+                                       min="0" max="2" step="0.1" value="{{ settings.ollama_temperature or 0.7 }}">
+                                <div class="form-text">Controls creativity (0 = deterministic, 2 = very creative)</div>
+                            </div>
+                            
+                            <div class="d-grid mb-3">
+                                <button type="button" id="test-ollama" class="btn btn-outline-primary">
+                                    <i class="bi bi-check-circle"></i> Test Connection
+                                </button>
+                            </div>
+                            
+                            <div id="ollama-test-result"></div>
+                        </div>
+                        
+                        <h5 class="border-bottom pb-2 mb-3 mt-4">General Settings</h5>
+                        
+                        <div class="mb-3">
+                            <label for="logs_retention" class="form-label">Logs Retention (days)</label>
+                            <input type="number" class="form-control" id="logs_retention" name="logs_retention" 
+                                   value="{{ settings.logs_retention or 30 }}" min="1" max="365">
+                            <div class="form-text">Number of days to keep logs</div>
+                        </div>
+                        
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save"></i> Save Settings
+                            </button>
+                            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left"></i> Back to Dashboard
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const ollamaEnabled = document.getElementById('ollama_enabled');
+        const ollamaSettings = document.getElementById('ollama-settings');
+        const testOllamaButton = document.getElementById('test-ollama');
+        const ollamaTestResult = document.getElementById('ollama-test-result');
+        const ollamaBaseUrl = document.getElementById('ollama_base_url');
+        const ollamaModel = document.getElementById('ollama_model');
+        const temperatureSlider = document.getElementById('ollama_temperature');
+        const temperatureValue = document.getElementById('temp-value');
+        
+        // Toggle Ollama settings visibility
+        ollamaEnabled.addEventListener('change', function() {
+            ollamaSettings.style.display = this.checked ? 'block' : 'none';
+        });
+        
+        // Update temperature value display
+        temperatureSlider.addEventListener('input', function() {
+            temperatureValue.textContent = this.value;
+        });
+        
+        // Test Ollama connection
+        testOllamaButton.addEventListener('click', function() {
+            testOllamaButton.disabled = true;
+            testOllamaButton.innerHTML = '<i class="bi bi-hourglass-split"></i> Testing...';
+            ollamaTestResult.innerHTML = '';
+            
+            fetch('/test_ollama', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    base_url: ollamaBaseUrl.value,
+                    model: ollamaModel.value
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    ollamaTestResult.innerHTML = `
+                        <div class="alert alert-success">
+                            <i class="bi bi-check-circle-fill"></i> Connection successful! Available models:
+                            <ul class="mb-0 mt-2">
+                                ${data.models.map(model => `<li>${model}</li>`).join('')}
+                            </ul>
+                        </div>
+                    `;
+                } else {
+                    ollamaTestResult.innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="bi bi-exclamation-triangle-fill"></i> ${data.error}
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                ollamaTestResult.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle-fill"></i> Error: ${error.message}
+                    </div>
+                `;
+            })
+            .finally(() => {
+                testOllamaButton.disabled = false;
+                testOllamaButton.innerHTML = '<i class="bi bi-check-circle"></i> Test Connection';
+            });
+        });
+    });
+</script>
+{% endblock %}

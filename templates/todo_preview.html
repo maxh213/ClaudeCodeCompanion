@@ -1,0 +1,147 @@
+{% extends "layout.html" %}
+
+{% block title %}TODO Preview{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-list-task"></i> TODO.md Preview
+                    </h5>
+                    <div>
+                        <button id="refresh-todo" class="btn btn-light btn-sm">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh
+                        </button>
+                        <a href="{{ url_for('edit_todo', session_id=session.session_id) }}" class="btn btn-primary btn-sm">
+                            <i class="bi bi-pencil"></i> Edit
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if todo_content %}
+                        <div class="todo-preview">
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between">
+                                    <h6><i class="bi bi-file-earmark-text"></i> Path: <code>{{ todo_path }}</code></h6>
+                                    <small class="text-muted">Last updated: {{ last_updated }}</small>
+                                </div>
+                            </div>
+                            <div class="todo-content">
+                                <pre class="border rounded p-3 bg-light mb-0"><code>{{ todo_content }}</code></pre>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i> No TODO.md file found at <code>{{ todo_path }}</code>.
+                        </div>
+                        <div class="d-grid gap-2">
+                            <a href="{{ url_for('create_todo', session_id=session.session_id) }}" class="btn btn-primary">
+                                <i class="bi bi-plus-circle"></i> Create TODO.md
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    {% if todo_content %}
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-clock"></i> Pending Tasks
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if task_status.pending %}
+                        <ul class="list-group">
+                            {% for task in task_status.pending %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>{{ task }}</span>
+                                <a href="{{ url_for('prompt', session_id=session.session_id) }}?task_type=new&task={{ task|urlencode }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-play-circle"></i> Start
+                                </a>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> No pending tasks found.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-search"></i> For Review
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if task_status.review %}
+                        <ul class="list-group">
+                            {% for task in task_status.review %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>{{ task }}</span>
+                                <a href="{{ url_for('prompt', session_id=session.session_id) }}?task_type=review&task={{ task|urlencode }}" class="btn btn-sm btn-outline-secondary">
+                                    <i class="bi bi-search"></i> Review
+                                </a>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> No tasks for review.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-check-circle"></i> Completed Tasks
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if task_status.completed %}
+                        <ul class="list-group">
+                            {% for task in task_status.completed %}
+                            <li class="list-group-item">
+                                <span class="text-muted text-decoration-line-through">{{ task }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> No completed tasks yet.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const refreshButton = document.getElementById('refresh-todo');
+        if (refreshButton) {
+            refreshButton.addEventListener('click', function() {
+                location.reload();
+            });
+        }
+    });
+</script>
+{% endblock %}
