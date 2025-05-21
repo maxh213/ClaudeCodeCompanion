@@ -52,30 +52,62 @@ def write_file(file_path, content):
         logging.error(f"Error writing to file {file_path}: {e}")
         return False
 
-def run_git_command(repo_path, command, capture_output=True):
-    """Run a git command in the repository."""
-    full_command = ['git'] + command
-    cwd = Path(repo_path).absolute()
-    
+def run_command(cwd, command, capture_output=True):
+    """Run a command in the specified directory."""
     try:
         if capture_output:
             result = subprocess.run(
-                full_command, 
+                command, 
                 cwd=cwd, 
                 check=True, 
                 text=True, 
-                capture_output=True
+                capture_output=True,
+                shell=isinstance(command, str)
             )
             return result.stdout.strip()
         else:
-            subprocess.run(full_command, cwd=cwd, check=True)
+            subprocess.run(command, cwd=cwd, check=True, shell=isinstance(command, str))
             return True
     except subprocess.CalledProcessError as e:
-        logging.error(f"Git command failed: {' '.join(full_command)}")
+        logging.error(f"Command failed: {command}")
         logging.error(f"Error: {e}")
         if capture_output and e.stderr:
-            logging.error(f"Git error output: {e.stderr}")
+            logging.error(f"Error output: {e.stderr}")
         raise
+
+def run_git_command(repo_path, command, capture_output=True, use_gh_cli=False):
+    """Run a git command in the repository. Can use gh CLI if configured."""
+    cwd = Path(repo_path).absolute()
+    
+    if use_gh_cli and command[0] in ["pr", "issue", "repo"]:
+        # For GitHub CLI commands
+        full_command = ['gh'] + command
+    else:
+        # For standard git commands
+        full_command = ['git'] + command
+    
+    return run_command(cwd, full_command, capture_output)
+
+def run_gh_command(repo_path, command, capture_output=True):
+    """Run a GitHub CLI command in the repository."""
+    cwd = Path(repo_path).absolute()
+    full_command = ['gh'] + command
+    
+    return run_command(cwd, full_command, capture_output)
+
+def check_gh_cli_installed():
+    """Check if GitHub CLI is installed."""
+    try:
+        result = subprocess.run(
+            ['gh', '--version'], 
+            check=True, 
+            capture_output=True, 
+            text=True
+        )
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        logging.warning("GitHub CLI (gh) is not installed or not in PATH")
+        return False
 
 def initialize_git_repo(repo_path):
     """Initialize a git repository if it doesn't exist."""
@@ -98,12 +130,42 @@ def initialize_git_repo(repo_path):
             raise
     return True
 
-def create_branch(repo_path, branch_name, base_branch):
-    """Create a new git branch."""
+def create_branch(repo_path, branch_name, base_branch, use_gh_cli=False):
+    """Create a new git branch. Can use GitHub CLI if available."""
     try:
         # Initialize repository if needed
         initialize_git_repo(repo_path)
         
+        # Check if GitHub CLI should be used
+        gh_cli_available = use_gh_cli and check_gh_cli_installed()
+        
+        if gh_cli_available:
+            # Try to use GitHub CLI for branch management
+            try:
+                # First check if branch exists
+                branches = run_gh_command(repo_path, ['pr', 'list', '--head', branch_name])
+                if branches:
+                    logging.info(f"Branch {branch_name} already exists remotely")
+                
+                # Make sure we're on the base branch
+                run_git_command(repo_path, ['checkout', base_branch], capture_output=False)
+                
+                # Try to pull latest changes
+                try:
+                    run_git_command(repo_path, ['pull'], capture_output=False)
+                except:
+                    logging.warning("Could not pull latest changes. Remote may not be set up.")
+                
+                # Create and checkout new branch
+                run_git_command(repo_path, ['checkout', '-b', branch_name], capture_output=False)
+                
+                logging.info(f"Created and checked out branch using GitHub CLI: {branch_name}")
+                return True
+            except Exception as gh_err:
+                logging.warning(f"Failed to create branch using GitHub CLI: {gh_err}")
+                logging.info("Falling back to standard git commands")
+        
+        # Use standard git commands (fallback or primary approach)    
         # Try to use the base branch if it exists
         try:
             # Make sure we're on the base branch
@@ -146,12 +208,57 @@ def create_branch(repo_path, branch_name, base_branch):
         logging.error(f"Error creating branch: {e}")
         raise
 
-def create_pr(repo_path, branch_name, base_branch, title, description):
-    """Create a pull request using git."""
+def create_pr(repo_path, branch_name, base_branch, title, description, use_gh_cli=False):
+    """Create a pull request. Can use GitHub CLI if available."""
     try:
         # Default PR URL for local repos
         pr_url = f"Local branch created: {branch_name}"
         
+        # Check if GitHub CLI should be used and is available
+        gh_cli_available = use_gh_cli and check_gh_cli_installed()
+        
+        if gh_cli_available:
+            try:
+                # Push the branch to remote first
+                run_git_command(repo_path, ['push', '--set-upstream', 'origin', branch_name], capture_output=False)
+                
+                # Check if PR already exists
+                existing_prs = run_gh_command(repo_path, ['pr', 'list', '--head', branch_name])
+                
+                if existing_prs and "No pull requests" not in existing_prs:
+                    logging.info(f"PR already exists for branch {branch_name}")
+                    # Get PR URL
+                    pr_info = run_gh_command(repo_path, ['pr', 'view', '--json', 'url', '--head', branch_name])
+                    if pr_info and '"url":' in pr_info:
+                        try:
+                            import json
+                            pr_data = json.loads(pr_info)
+                            pr_url = pr_data.get('url', pr_url)
+                        except:
+                            pr_url = f"Existing PR for {branch_name}"
+                else:
+                    # Create new PR
+                    logging.info(f"Creating new PR from {branch_name} to {base_branch}")
+                    pr_output = run_gh_command(
+                        repo_path, 
+                        ['pr', 'create', 
+                         '--title', title,
+                         '--body', description,
+                         '--base', base_branch,
+                         '--head', branch_name,
+                         '--web'], # Open in web browser for review
+                        capture_output=True
+                    )
+                    if pr_output:
+                        pr_url = pr_output.strip()
+                
+                logging.info(f"PR URL (GitHub CLI): {pr_url}")
+                return pr_url
+            except Exception as gh_err:
+                logging.warning(f"Failed to create PR using GitHub CLI: {gh_err}")
+                logging.info("Falling back to standard git commands")
+        
+        # Fallback to standard git approach
         # Check if remote exists
         try:
             # Try to get remote URL
@@ -198,7 +305,7 @@ def create_pr(repo_path, branch_name, base_branch, title, description):
         logging.error(f"Error creating PR: {e}")
         return "Error creating PR"
 
-def commit_changes(repo_path, commit_message):
+def commit_changes(repo_path, commit_message, use_gh_cli=False):
     """Commit all changes in the repository."""
     try:
         # Add all files
@@ -207,9 +314,14 @@ def commit_changes(repo_path, commit_message):
         # Commit with message
         run_git_command(repo_path, ['commit', '-m', commit_message], capture_output=False)
         
-        # Try to push to remote, but don't fail if remote is not set up
+        # Try to push to remote
         try:
-            run_git_command(repo_path, ['push'], capture_output=False)
+            if use_gh_cli and check_gh_cli_installed():
+                # Use gh push command for better error handling and authentication
+                run_gh_command(repo_path, ['repo', 'sync'], capture_output=False)
+            else:
+                # Use standard git push
+                run_git_command(repo_path, ['push'], capture_output=False)
         except Exception as push_error:
             logging.warning(f"Could not push to remote: {push_error}")
             logging.info("Changes committed locally only")

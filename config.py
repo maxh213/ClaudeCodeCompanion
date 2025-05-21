@@ -11,6 +11,7 @@ DEFAULT_CONFIG = {
     "log_level": "INFO",
     "max_tasks": 0,
     "session_id": None,
+    "use_gh_cli": True
 }
 
 # Task prompt template
@@ -26,18 +27,23 @@ Follow these steps precisely:
     *   **State clearly which task you have selected.** For example: "I will work on: [ ] Implement API endpoints for animals list and details that match the frontend".
     *   Do **NOT** plan or discuss any other tasks.
 3.  **Branch and PR Management:**
-    *   Note that all your task implementations are part of a single branch session.
-    *   All your changes will be included in the same pull request for the entire session.
-    *   You do not need to create separate branches or PRs for each task.
+    *   Always use GitHub CLI (`gh`) for all Git operations.
+    *   All your changes will be committed to the current branch.
+    *   For PR management, use commands like:
+        *   `gh pr create --title "Title" --body "Description"`
+        *   `gh pr view --web` to check existing PRs
+    *   You'll be working within a single branch for the entire session.
 4.  **Implement the Selected Task:**
     *   Develop the code necessary to complete **only the selected task**.
     *   Adhere to the project's standards and requirements as outlined in the .md files.
+    *   Work completely autonomously without asking for approval to proceed.
 5.  **Prepare for Code Review:**
     *   Modify the `TODO.md` content to mark the task for review: change "[ ]" to "[R]" for the implemented task.
     *   If the task was part of a larger item, update its sub-tasks or add a note for the next logical step *for that specific item only*.
     *   Do **NOT** add new, unrelated TODOs or plan future work beyond the immediate next step for the completed item if necessary.
+    *   Commit your changes with a descriptive message using `gh` commands.
 
-**Crucial Instruction:** Focus exclusively on the single task you select. Do not outline a plan for multiple tasks or work on anything beyond the one item identified in Step 2. Before committing your changes ask me to verify it worked ok and test. You don't need to run the project I will handle that.
+**Crucial Instruction:** Focus exclusively on the single task you select. Do not outline a plan for multiple tasks or work on anything beyond the one item identified in Step 2. You are expected to work completely autonomously - proceed with confidence and don't wait for verification before committing changes.
 """
 
 # Review prompt template
@@ -52,19 +58,24 @@ Follow these steps precisely:
     *   **State clearly which task you are reviewing.** 
     *   Do **NOT** plan or discuss any other tasks.
 3.  **Branch and PR Management:**
-    *   Note that all your task implementations are part of a single branch session.
-    *   All your changes will be included in the same pull request for the entire session.
-    *   You do not need to create separate branches or PRs for each task.
+    *   Always use GitHub CLI (`gh`) for all Git operations.
+    *   All your changes will be committed to the current branch.
+    *   For PR management, use commands like:
+        *   `gh pr view` to check existing PRs
+        *   `gh pr comment "PR feedback"` to add comments
+    *   You'll be working within a single branch for the entire session.
 4.  **Review Implementation:**
     *   Carefully review the code changes related to this task.
     *   Fix any issues, bugs, or improvements needed.
     *   Make sure the implementation meets the project's standards and requirements.
+    *   Work completely autonomously without asking for approval to proceed.
 5.  **Complete the Task:**
     *   After you're satisfied with the implementation, modify the `TODO.md` content to mark the task as complete: change "[R]" to "[x]" for the reviewed task.
     *   If the task was part of a larger item, update its sub-tasks or add a note for the next logical step *for that specific item only*.
     *   Do **NOT** add new, unrelated TODOs or plan future work beyond the immediate next step for the completed item if necessary.
+    *   Commit your changes with a descriptive message using `gh` commands.
 
-**Crucial Instruction:** Focus exclusively on the single task you are reviewing. Do not outline a plan for multiple tasks or work on anything beyond the one item identified in Step 2. Before committing your changes ask me to verify it worked ok and test. You don't need to run the project I will handle that.
+**Crucial Instruction:** Focus exclusively on the single task you are reviewing. Do not outline a plan for multiple tasks or work on anything beyond the one item identified in Step 2. You are expected to work completely autonomously - proceed with confidence and don't wait for verification before committing changes.
 """
 
 # Empty TODO list template

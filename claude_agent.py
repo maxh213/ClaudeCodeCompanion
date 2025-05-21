@@ -241,6 +241,10 @@ def run_claude_interaction(config, session_state, is_review=False):
             # All tasks are completed
             prompt = format_prompt_for_all_completed()
             logging.info("All tasks completed in TODO.md")
+            # End the session automatically when all tasks are completed
+            session_state['all_completed'] = True
+            save_session_state(session_state)
+            return True
         elif task_type == "review" or task_type == "task":
             # Regular task found
             session_state['current_task'] = next_task
@@ -279,7 +283,8 @@ def run_claude_interaction(config, session_state, is_review=False):
         session_state['current_task'] = None
     
     try:
-        commit_changes(config['repo_path'], commit_message)
+        # Use GitHub CLI if configured
+        commit_changes(config['repo_path'], commit_message, config.get('use_gh_cli', False))
         logging.info(f"Committed changes: {commit_message}")
         save_session_state(session_state)
         return True
@@ -295,17 +300,30 @@ def main():
     config = load_config(args)
     session_state = initialize_session(config)
     
+    # Initialize 'all_completed' flag if it doesn't exist
+    if 'all_completed' not in session_state:
+        session_state['all_completed'] = False
+    
     print(f"\n[Claude Agent] Starting session: {session_state['session_id']}")
     print(f"[Claude Agent] Working with repository: {config['repo_path']}")
     print(f"[Claude Agent] TODO file: {config['todo_file']}")
+    print(f"[Claude Agent] Using GitHub CLI: {config.get('use_gh_cli', False)}")
     print(f"[Claude Agent] Claude will manage branches and PRs through the prompt instructions")
+    print(f"[Claude Agent] Autonomous mode: Tasks will automatically continue without user confirmation")
     
     # Main loop for processing tasks
     try:
         max_tasks = config["max_tasks"]
         task_complete = True  # Start with task complete (not in review)
+        auto_mode = True  # Set to True for hands-off mode
         
         while max_tasks == 0 or session_state["task_count"] < max_tasks:
+            # Check if all tasks are completed
+            if session_state.get('all_completed', False):
+                logging.info("All tasks are completed in TODO.md. Ending session.")
+                print("\n[Claude Agent] All tasks are completed in TODO.md. Ending session.")
+                break
+                
             # If previous task is complete, start a new task; otherwise, review previous task
             if task_complete:
                 print("\n[Claude Agent] Working on a new task...")
@@ -322,12 +340,18 @@ def main():
             print("[Claude Agent] Claude's context has been cleared. Next iteration will be a fresh interaction.")
             print("="*80 + "\n")
             
-            # Ask if user wants to continue
-            response = input("[Claude Agent] Continue to next task? (y/n): ").strip().lower()
-            if response != 'y':
-                logging.info("Session ended by user")
-                print("[Claude Agent] Session ended by user request.")
-                break
+            # In automatic mode, we don't ask for confirmation
+            if not auto_mode:
+                # Ask if user wants to continue
+                response = input("[Claude Agent] Continue to next task? (y/n): ").strip().lower()
+                if response != 'y':
+                    logging.info("Session ended by user")
+                    print("[Claude Agent] Session ended by user request.")
+                    break
+            else:
+                # In automatic mode, add a brief delay between tasks
+                print("[Claude Agent] Continuing to next task automatically in 3 seconds...")
+                time.sleep(3)
     
     except KeyboardInterrupt:
         logging.info("Session interrupted by user")
