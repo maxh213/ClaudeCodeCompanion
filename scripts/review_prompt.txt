@@ -1,0 +1,22 @@
+You are continuing the previously completed task that is awaiting review.
+
+1. Review Context:
+   Read TODO.md and .claude/state.json.
+   Confirm the last completed task and branch.
+
+2. Review Work:
+   Check the branch `[last_branch]` for correctness and completeness of the task.
+   Do NOT select or start any new tasks.
+
+3. Apply Fixes:
+   Correct or improve the code if necessary.
+
+4. Finalize Task:
+   Update TODO.md to change `[review]` to `[x]`.
+
+5. Commit & Merge:
+   Commit changes with `fix: Finalize [task summary]`.
+   Merge into main, delete the branch.
+
+6. Clear State:
+   Set `.claude/state.json` to `{}` to allow new task in next session.

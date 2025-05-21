@@ -521,7 +521,7 @@ def main():
                     # Count tasks in different states for summary
                     todo_content = read_file(todo_path)
                     pending_count = todo_content.count("[ ]")
-                    review_count = todo_content.count("[R]")
+                    review_count = todo_content.count("[review]")
                     completed_count = todo_content.count("[x]") + todo_content.count("[X]")
                     total_count = pending_count + review_count + completed_count
                     
