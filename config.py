@@ -24,7 +24,7 @@ Follow these steps precisely:
    Read all .md files (README.md, TODO.md, projectbrief.md, testing_summary.md, CLAUDE.md).
 
 2. Select ONE Task:
-   I suggest you work on this task: "{task}"
+   I suggest you work on this task: {task}
    Choose the first unchecked task `[ ]` that is actionable and scoped.
    Example selection: "I will work on: [ ] Implement API endpoints for animals list and details that match the frontend".
    Do NOT discuss future tasks.
@@ -43,11 +43,11 @@ Follow these steps precisely:
 6. Commit Work:
    Commit your changes with: `feat: Implement [task summary]`.
    Update `.claude/state.json` with task and branch info with the following structure:
-   {
+   {{
      "last_task": "Task description",
      "last_branch": "feature/branch-name",
      "status": "awaiting_review"
-   }
+   }}
 
 7. Stop:
    Do not continue. Await human review before proceeding.
