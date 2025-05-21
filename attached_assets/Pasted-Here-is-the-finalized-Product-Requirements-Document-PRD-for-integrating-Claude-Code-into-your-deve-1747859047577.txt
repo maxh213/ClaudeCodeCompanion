@@ -1,0 +1,215 @@
+Here is the finalized Product Requirements Document (PRD) for integrating Claude Code into your development workflow, incorporating the correct usage of the Claude CLI and ensuring compatibility with Replit's environment.
+
+---
+
+# **Product Requirements Document (PRD): Automated Claude Code Agent with Task-Scoped Branching and Review Workflow**
+
+---
+
+## **Project Title**
+
+Automated Claude Code Agent – One-Task Scoped Git Workflow with Mark-for-Review and Revision Loops
+
+---
+
+## **Overview**
+
+This system leverages **Claude Code**, an AI-assisted coding agent developed by Anthropic, to automate the development process by handling one task at a time from a `TODO.md` file. The workflow includes creating a new Git branch for each task, marking tasks for review upon completion, and allowing for human verification before finalizing and merging changes.
+
+---
+
+## **What is Claude Code?**
+
+**Claude Code** is an agentic coding tool that operates directly in your terminal. It understands your codebase and assists in coding tasks through natural language commands. Key features include:([Anthropic][1])
+
+* Editing files and fixing bugs across your codebase
+* Answering questions about your code’s architecture and logic
+* Executing and fixing tests, linting, and other commands
+* Searching through git history, resolving merge conflicts, and creating commits and PRs
+* Operating in interactive (`claude`) and one-shot (`claude -p "prompt"`) modes([Anthropic][1], [Anthropic][2])
+
+For more details, refer to the [Claude Code CLI usage documentation](https://docs.anthropic.com/en/docs/claude-code/cli-usage).
+
+---
+
+## **Goals**
+
+* Automate task execution using Claude Code
+* Maintain session isolation using Git branches
+* Use `[review]` instead of `[x]` in `TODO.md` to signal human intervention
+* Provide human-in-the-loop task finalization
+* Avoid AI scope creep and enforce discrete change sets([Anthropic][1])
+
+---
+
+## **Directory and File Structure**
+
+```
+/
+├── TODO.md
+├── README.md
+├── projectbrief.md
+├── testing_summary.md
+├── CLAUDE.md
+├── .claude/
+│   ├── state.json
+│   └── logs/
+│       └── session_YYYY-MM-DD.md
+├── scripts/
+│   └── run_claude_task.sh
+```
+
+---
+
+## **File Purposes**
+
+### `TODO.md`
+
+Markdown checklist of development tasks. Tasks start as `[ ]`, become `[review]` when Claude finishes them, and become `[x]` after human review.
+
+### `README.md`, `projectbrief.md`, `testing_summary.md`, `CLAUDE.md`
+
+Project documentation Claude uses as context when selecting and executing a task.
+
+### `.claude/state.json`
+
+Stores task progress between Claude Code sessions:
+
+```json
+{
+  "last_task": "Implement search filter for user list",
+  "last_branch": "feature/implement-search-filter",
+  "status": "awaiting_review"
+}
+```
+
+---
+
+## **Claude Code Prompt: Phase 1 (Task Implementation)**
+
+Stored in `scripts/task_prompt.txt`:
+
+```text
+You are an expert senior software engineer working on production enhancements for the write-to platform.
+Your sole objective for this interaction is to complete exactly one task.
+
+Follow these steps precisely:
+
+1. Review Context:
+   Read all .md files (README.md, TODO.md, projectbrief.md, testing_summary.md, CLAUDE.md).
+
+2. Select ONE Task:
+   Open TODO.md.
+   Choose the first unchecked task `[ ]` that is actionable and scoped.
+   Example selection: "I will work on: [ ] Implement API endpoints for animals list and details that match the frontend".
+   Do NOT discuss future tasks.
+
+3. Create Git Branch:
+   Generate a kebab-case name like `feature/implement-api-endpoints`.
+   Create and switch to this Git branch.
+
+4. Implement the Task:
+   Write or modify code as required to implement the selected task only.
+   Use the provided documentation as guidelines for style and behavior.
+
+5. Update TODO.md:
+   Replace `[ ]` with `[review]` for the selected task only.
+
+6. Commit Work:
+   Commit your changes with: `feat: Implement [task summary]`.
+   Update `.claude/state.json` with task and branch.
+
+7. Stop:
+   Do not continue. Await human review before proceeding.
+```
+
+---
+
+## **Claude Code Prompt: Phase 2 (Task Review/Fix)**
+
+Stored in `scripts/review_prompt.txt`:
+
+```text
+You are continuing the previously completed task that is awaiting review.
+
+1. Review Context:
+   Read TODO.md and .claude/state.json.
+   Confirm the last completed task and branch.
+
+2. Review Work:
+   Check the branch `[last_branch]` for correctness and completeness of the task.
+   Do NOT select or start any new tasks.
+
+3. Apply Fixes:
+   Correct or improve the code if necessary.
+
+4. Finalize Task:
+   Update TODO.md to change `[review]` to `[x]`.
+
+5. Commit & Merge:
+   Commit changes with `fix: Finalize [task summary]`.
+   Merge into main, delete the branch.
+
+6. Clear State:
+   Set `.claude/state.json` to `{}` to allow new task in next session.
+```
+
+---
+
+## **Replit Execution**
+
+### Entrypoint: `scripts/run_claude_task.sh`
+
+```bash
+#!/bin/bash
+
+STATE_FILE=".claude/state.json"
+
+if [[ -f "$STATE_FILE" && $(jq -r .status "$STATE_FILE") == "awaiting_review" ]]; then
+  PROMPT_FILE="./scripts/review_prompt.txt"
+else
+  PROMPT_FILE="./scripts/task_prompt.txt"
+fi
+
+claude -p "$(cat "$PROMPT_FILE")"
+```
+
+This script checks the status in `.claude/state.json` and decides which prompt to use. It then reads the appropriate prompt file and passes its content to Claude Code using the `-p` flag.
+
+---
+
+## **Test Cases**
+
+1. **Task Implementation**
+
+   * Claude selects `[ ] Implement login rate limiter`
+   * Creates branch
+   * Implements feature
+   * Marks task as `[review]`
+   * Commits
+
+2. **Task Review and Finalization**
+
+   * Claude reviews `[review] Implement login rate limiter`
+   * Identifies bug in logic
+   * Fixes bug
+   * Marks task as `[x]`
+   * Merges branch
+
+---
+
+## **Success Criteria**
+
+* Each session results in one commit and one branch
+* No tasks are implemented or planned beyond the selected one
+* Human always reviews `[review]` state before `[x]` is marked
+* `.claude/state.json` keeps session atomic and auditable
+
+---
+
+This PRD provides a comprehensive guide for integrating Claude Code into your development workflow, ensuring a structured and efficient process for task management and code implementation.
+
+---
+
+[1]: https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview?utm_source=chatgpt.com "Claude Code overview - Anthropic API"
+[2]: https://docs.anthropic.com/en/docs/claude-code/cli-usage?utm_source=chatgpt.com "CLI usage and controls - Claude Code - Anthropic API"

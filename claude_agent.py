@@ -184,9 +184,14 @@ def run_claude_api(prompt, repo_path, api_key=None):
     print("[Claude Agent] Using Claude Code CLI with live streaming...")
     
     # Create a temporary file for the prompt
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as temp_file:
-        temp_file_path = temp_file.name
-        temp_file.write(prompt)
+    temp_file_path = None
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as temp_file:
+            temp_file_path = temp_file.name
+            temp_file.write(prompt)
+    except Exception as e:
+        print(f"[Claude Agent] Error creating temporary file: {e}")
+        return f"ERROR: Failed to create temporary file: {str(e)}"
     
     # Save the prompt for reference
     prompt_file = Path(repo_path) / "claude_prompt.txt"
@@ -200,30 +205,32 @@ def run_claude_api(prompt, repo_path, api_key=None):
     start_time = datetime.now()
     print(f"[Claude Agent] Started at: {start_time.strftime('%H:%M:%S')}")
     
+    # Collect all output for final result
+    full_output = []
+    final_result = ""
+    
     try:
-        # Using stream-json format for real-time streaming output
-        # This will show the output as it's being generated
+        # Per documentation: Using stream-json format for real-time streaming output
         print("[Claude Agent] Starting Claude Code in streaming mode...")
         
-        # Command for streaming mode using 'stream-json' format
-        # Based on Claude Code documentation for streaming JSON output
+        # Command based on Claude Code documentation
+        # -p: Print response (non-interactive mode)
+        # --output-format stream-json: Stream output as JSON objects
+        # --verbose: Show detailed output
+        # --max-turns: Limit number of agentic turns
         cmd = ['claude', '-p', '--output-format', 'stream-json', '--verbose', '--max-turns', '10']
         
-        # Prepare the input content
-        with open(temp_file_path, 'r') as f:
-            prompt_text = f.read()
-        
-        # Start the process with Popen to capture real-time output
+        # Start the process with subprocess.run using input from the temp file
         print("[Claude Agent] Executing claude command with live streaming...")
         print("\n" + "="*80)
         print("[Claude Agent] STREAMING OUTPUT BEGIN")
         print("="*80)
         
-        # Create file to collect the entire output
-        full_output = []
-        final_result = ""
-        
-        # Use Popen to get real-time output
+        # Read the prompt from the temporary file
+        with open(temp_file_path, 'r') as f:
+            prompt_text = f.read()
+            
+        # Use Popen for streaming output
         process = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE,
@@ -234,76 +241,109 @@ def run_claude_api(prompt, repo_path, api_key=None):
             bufsize=1  # Line buffered
         )
         
-        # Send the prompt to the process
-        process.stdin.write(prompt_text)
-        process.stdin.close()
-        
+        # Send the prompt to stdin
+        if process.stdin:
+            process.stdin.write(prompt_text)
+            process.stdin.close()
+        else:
+            print("[Claude Agent] Error: Could not write to process stdin")
+            return "ERROR: Process stdin not available"
+            
         # Process output line by line as it comes in
-        for line in process.stdout:
-            # Print the line to show streaming output
-            print(line, end='', flush=True)
-            
-            # Collect the line for later processing
-            full_output.append(line)
-            
-            # Try to parse as JSON to extract assistant messages
-            try:
-                obj = json.loads(line)
-                # Look for assistant content as it streams in
-                if isinstance(obj, dict) and obj.get('role') == 'assistant' and 'content' in obj:
-                    content = obj['content']
-                    if content:
-                        sys.stdout.write("\033[34m")  # Blue text for Claude's responses
-                        print(f"CLAUDE: {content}")
-                        sys.stdout.write("\033[0m")  # Reset color
+        if process.stdout:
+            for line in process.stdout:
+                # Print the line to show streaming output
+                print(line, end='', flush=True)
                 
-                # Check for final system message with stats
-                if isinstance(obj, dict) and obj.get('role') == 'system':
-                    if 'result' in obj:
-                        final_result = obj['result']
-                    if 'cost_usd' in obj:
-                        print(f"[Claude Agent] Cost: ${obj['cost_usd']:.5f}")
-                    if 'duration_ms' in obj:
-                        print(f"[Claude Agent] Duration: {obj['duration_ms']/1000:.2f} seconds")
-            except json.JSONDecodeError:
-                # Not valid JSON, might be progress indicator or other output
-                pass
-        
+                # Collect all output
+                full_output.append(line)
+                
+                # Try to parse as JSON to extract meaningful content
+                try:
+                    obj = json.loads(line)
+                    
+                    # Format assistant messages nicely
+                    if isinstance(obj, dict) and obj.get('role') == 'assistant' and 'content' in obj:
+                        content = obj.get('content', '')
+                        if content:
+                            sys.stdout.write("\033[34m")  # Blue text for Claude's responses
+                            print(f"CLAUDE: {content}")
+                            sys.stdout.write("\033[0m")  # Reset color
+                    
+                    # Get the final result from the system message
+                    if isinstance(obj, dict) and obj.get('role') == 'system':
+                        if 'result' in obj:
+                            final_result = obj['result']
+                        if 'cost_usd' in obj:
+                            print(f"[Claude Agent] Cost: ${obj['cost_usd']:.5f}")
+                        if 'duration_ms' in obj:
+                            print(f"[Claude Agent] Duration: {obj['duration_ms']/1000:.2f} seconds")
+                            
+                except json.JSONDecodeError:
+                    # Not JSON, might be progress indicator or other output
+                    pass
+        else:
+            print("[Claude Agent] Error: Process stdout not available")
+            return "ERROR: Process stdout not available"
+            
         # Check stderr for any errors
-        stderr_output = process.stderr.read()
-        if stderr_output:
-            print(f"[Claude Agent] STDERR: {stderr_output}")
+        if process.stderr:
+            stderr_output = process.stderr.read()
+            if stderr_output:
+                print(f"[Claude Agent] STDERR: {stderr_output}")
         
-        # Get process return code
+        # Wait for process to complete
         return_code = process.wait()
         
-        print("="*80)
+        print("\n" + "="*80)
         print("[Claude Agent] STREAMING OUTPUT END")
-        print("="*80 + "\n")
+        print("="*80)
         
         end_time = datetime.now()
         elapsed = (end_time - start_time).total_seconds()
         print(f"[Claude Agent] Completed at: {end_time.strftime('%H:%M:%S')} (took {elapsed:.2f} seconds)")
         
-        # If we didn't get a result from the JSON parsing, try to reconstruct it
+        # If we didn't parse the final result successfully, try to extract it
         if not final_result and full_output:
-            # Combine everything as raw output
+            # First try to find the system message with the result
             raw_output = ''.join(full_output)
-            
-            # Try to find and parse the final system message JSON object
             output_lines = raw_output.strip().split('\n')
+            
+            # Look for system messages from the end (they contain the final result)
             for line in reversed(output_lines):
+                if not line.strip():
+                    continue
+                    
                 try:
                     obj = json.loads(line)
                     if isinstance(obj, dict) and obj.get('role') == 'system' and 'result' in obj:
                         final_result = obj['result']
                         break
-                except:
+                except Exception:
                     continue
+            
+            # If we still don't have a result, collect all assistant messages
+            if not final_result:
+                assistant_messages = []
+                for line in output_lines:
+                    if not line.strip():
+                        continue
+                    
+                    try:
+                        obj = json.loads(line)
+                        if isinstance(obj, dict) and obj.get('role') == 'assistant' and 'content' in obj:
+                            content = obj.get('content', '')
+                            if content:
+                                assistant_messages.append(content)
+                    except Exception:
+                        continue
+                
+                if assistant_messages:
+                    final_result = '\n'.join(assistant_messages)
         
-        # If we still don't have a result, use the whole output
+        # If we still don't have a result, use all the output as a fallback
         if not final_result:
-            print("[Claude Agent] Warning: Could not extract final result, using raw output")
+            print("[Claude Agent] Warning: Could not extract final result from JSON, using raw output")
             final_result = ''.join(full_output)
         
         # Save the response for reference
@@ -333,10 +373,11 @@ def run_claude_api(prompt, repo_path, api_key=None):
         
     finally:
         # Clean up the temporary file
-        try:
-            os.unlink(temp_file_path)
-        except:
-            pass
+        if temp_file_path:
+            try:
+                os.unlink(temp_file_path)
+            except Exception as e:
+                print(f"[Claude Agent] Warning: Could not delete temporary file: {e}")
 
 def run_claude_interaction(config, session_state, is_review=False):
     """Run a single Claude interaction for a task or review."""
