@@ -157,24 +157,10 @@ def initialize_session(config):
     
     # Create new session
     session_id = f"{int(time.time())}"
-    branch_name = f"{config['branch_prefix']}{session_id}"
     
-    # Create a new branch
-    create_branch(config['repo_path'], branch_name, config['pr_base'])
-    
-    # Create the PR
-    pr_url = create_pr(
-        config['repo_path'], 
-        branch_name, 
-        config['pr_base'], 
-        config['pr_title'], 
-        f"Automated claude session {session_id}"
-    )
-    
+    # We don't create branches or PRs - Claude will be instructed to do this
     session_state = {
         "session_id": session_id,
-        "branch_name": branch_name,
-        "pr_url": pr_url,
         "completed_tasks": [],
         "current_task": None,
         "task_count": 0,
@@ -182,7 +168,7 @@ def initialize_session(config):
     }
     
     save_session_state(session_state)
-    logging.info(f"Started new session {session_id} on branch {branch_name}")
+    logging.info(f"Started new session {session_id}")
     return session_state
 
 def run_claude_api(prompt, repo_path, api_key=None):
