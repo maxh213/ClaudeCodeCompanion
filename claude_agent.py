@@ -103,9 +103,17 @@ def load_config(args):
     
     return config
 
+def get_session_dir():
+    """Get the directory for storing session files."""
+    # Always store session files in the current directory where the script is run
+    # This avoids polluting the target repo
+    session_dir = Path(".")
+    return session_dir
+
 def load_session_state(session_id):
     """Load existing session state from file."""
-    session_file = Path(f".claude_session_{session_id}.json")
+    session_dir = get_session_dir()
+    session_file = session_dir / f".claude_session_{session_id}.json"
     if session_file.exists():
         try:
             with open(session_file, 'r') as f:
@@ -117,7 +125,8 @@ def load_session_state(session_id):
 
 def save_session_state(session_state):
     """Save current session state to file."""
-    session_file = Path(f".claude_session_{session_state['session_id']}.json")
+    session_dir = get_session_dir()
+    session_file = session_dir / f".claude_session_{session_state['session_id']}.json"
     try:
         with open(session_file, 'w') as f:
             json.dump(session_state, f, indent=2)
@@ -126,6 +135,15 @@ def save_session_state(session_state):
 
 def initialize_session(config):
     """Initialize a new session or resume an existing one."""
+    # Make sure the repo path exists
+    repo_path = Path(config['repo_path'])
+    if not repo_path.exists():
+        logging.error(f"Repository path does not exist: {repo_path}")
+        raise ValueError(f"Repository path does not exist: {repo_path}")
+    
+    # Store session files in the workspace directory to avoid polluting the target repo
+    workspace_dir = Path(".")
+    
     if config["session_id"]:
         # Try to resume existing session
         session_state = load_session_state(config["session_id"])
@@ -157,7 +175,8 @@ def initialize_session(config):
         "pr_url": pr_url,
         "completed_tasks": [],
         "current_task": None,
-        "task_count": 0
+        "task_count": 0,
+        "repo_path": str(repo_path.absolute())
     }
     
     save_session_state(session_state)
