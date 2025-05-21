@@ -1,15 +1,16 @@
 """
 Configuration settings for the Claude Agent.
 """
+import os
+from pathlib import Path
 
+# Default configuration
 DEFAULT_CONFIG = {
     "repo_path": ".",
     "todo_file": "TODO.md",
-    "branch_prefix": "claude-session-",
-    "pr_title": "Claude Session Changes",
-    "pr_base": "main",
+    "log_file": "claude_log.txt",
+    "max_tasks": 0,  # 0 means unlimited
     "log_level": "INFO",
-    "max_tasks": 0,
     "session_id": None,
     "use_gh_cli": True
 }
@@ -58,7 +59,7 @@ REVIEW_PROMPT_TEMPLATE = """You are continuing the previously completed task tha
 
 1. Review Context:
    Read TODO.md and .claude/state.json.
-   This task was previously marked for review: "{task}"
+   This task was previously marked for review: {task}
    Confirm this is the last completed task in the state file.
 
 2. Review Work:
@@ -76,36 +77,32 @@ REVIEW_PROMPT_TEMPLATE = """You are continuing the previously completed task tha
    Merge into main, delete the branch.
 
 6. Clear State:
-   Set `.claude/state.json` to `{}` to allow new task in next session.
+   Set `.claude/state.json` to {{}} to allow new task in next session.
 """
 
 # Empty TODO list template
 EMPTY_TODO_TEMPLATE = """You are an expert senior software engineer working on production enhancements.
 
-I notice that the TODO.md file is empty or doesn't contain any tasks marked with "[ ]" or "[R]". This means there are no specific tasks for you to work on at the moment.
+I notice that the TODO.md file is empty or doesn't contain any tasks marked with "[ ]" or "[review]". This means there are no specific tasks for you to work on at the moment.
 
-Here are some suggestions for what you could do:
+Please suggest creating a new TODO.md file with some initial tasks, or provide guidance on what to do next. Use your expertise to suggest potential improvements or features that could be added to the project.
 
-1. If you believe all tasks have been completed, congratulate the team on a job well done.
-
-2. If this is a new project, you could suggest creating a TODO.md file with some initial tasks based on the project's README.md and other documentation.
-
-3. If there are tasks in the TODO.md but they are not formatted correctly (they should use "- [ ]" format), you could offer to reformat them.
-
-Please respond with your thoughts on the current state of the project and any recommendations you have for next steps. You can also ask the user if there are specific tasks they would like you to focus on.
+Feel free to:
+1. Create a basic TODO.md template with some common development tasks
+2. Suggest a project structure if this is a new project
+3. Offer to analyze the existing codebase to identify potential improvement areas
 """
 
 # All tasks completed template
 ALL_TASKS_COMPLETED_TEMPLATE = """You are an expert senior software engineer working on production enhancements.
 
-Congratulations! It appears that all tasks in the TODO.md file have been completed. This is an excellent milestone for the project.
+Great news! All tasks in the TODO.md file are marked as completed. The project has reached the milestone you set out to achieve.
 
-Would you like me to:
+Please provide a summary of the work that was done and suggest next steps. You could:
+1. Suggest creating new tasks for the next phase of development
+2. Offer to perform a comprehensive code review
+3. Suggest improvements or optimizations based on the completed work
+4. Recommend adding tests or documentation for the completed features
 
-1. Review the entire project for any potential improvements or optimizations?
-2. Suggest new features or enhancements that could be added to the project?
-3. Create a new set of tasks for the next phase of development?
-4. Something else?
-
-Please let me know how you'd like to proceed, and I'd be happy to help with the next steps.
+Feel free to analyze the current state of the project and provide your professional recommendations on how to proceed from here.
 """
