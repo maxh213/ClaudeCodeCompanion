@@ -172,43 +172,80 @@ def initialize_session(config):
     return session_state
 
 def run_claude_api(prompt, repo_path, api_key=None):
-    """Run a Claude API request.
+    """Run a Claude API request using the local 'claude code' command-line tool."""
     
-    This is a placeholder for the direct Claude API integration.
-    In a real implementation, this would use the Claude API client to send a message
-    and receive a response.
-    """
-    # This is intentionally left as a placeholder
-    # In a real implementation, we would use something like:
-    # from claude_api import ClaudeAPI
-    # client = ClaudeAPI(api_key)
-    # response = client.message(prompt)
+    import subprocess
+    import tempfile
+    import os
     
-    # Inform the user what's happening
     print(f"\n[Claude Agent] Working on task in {repo_path}...")
-    print("[Claude Agent] Sending prompt to Claude...")
+    print("[Claude Agent] Sending prompt to Claude via 'claude code' command line...")
     
-    # For now, we'll just show the prompt and ask the user to manually provide the Claude output
-    print("\n" + "="*80)
-    print("PROMPT FOR CLAUDE:")
-    print("="*80)
-    print(prompt)
-    print("="*80 + "\n")
+    # Save the prompt to a temporary file
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as temp_file:
+        temp_file_path = temp_file.name
+        temp_file.write(prompt)
     
-    # Wait for the user to run this through Claude and provide the output
-    print("[Claude Agent] Please copy this prompt to Claude and paste Claude's response below.")
-    print("[Claude Agent] Type 'DONE' on a new line when finished.")
+    try:
+        # Run the claude code command with the temporary file as input
+        print("[Claude Agent] Executing claude code command...")
+        result = subprocess.run(
+            ['claude', 'code', '--file', temp_file_path],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=repo_path
+        )
+        
+        # Get the response from stdout
+        response = result.stdout
+        
+        # Log success
+        print("[Claude Agent] Successfully received response from Claude")
+        print(f"[Claude Agent] Response length: {len(response)} characters")
+        
+        # Validate response
+        if not response or len(response.strip()) < 10:
+            print("[Claude Agent] Warning: Response seems too short, might indicate an error")
+        
+        return response
     
-    # Collect user input until they indicate they're done
-    lines = []
-    while True:
-        line = input()
-        if line.strip() == "DONE":
-            break
-        lines.append(line)
+    except subprocess.CalledProcessError as e:
+        # Handle error in the command execution
+        error_message = f"Error executing claude code command: {e}"
+        if e.stderr:
+            error_message += f"\nDetails: {e.stderr}"
+        
+        print(f"[Claude Agent] {error_message}")
+        print("[Claude Agent] Falling back to manual input mode...")
+        
+        # Fallback to manual mode if the command fails
+        print("\n" + "="*80)
+        print("PROMPT FOR CLAUDE:")
+        print("="*80)
+        print(prompt)
+        print("="*80 + "\n")
+        
+        print("[Claude Agent] Please copy this prompt to Claude and paste Claude's response below.")
+        print("[Claude Agent] Type 'DONE' on a new line when finished.")
+        
+        # Collect user input until they indicate they're done
+        lines = []
+        while True:
+            line = input()
+            if line.strip() == "DONE":
+                break
+            lines.append(line)
+        
+        response = "\n".join(lines)
+        return response
     
-    response = "\n".join(lines)
-    return response
+    finally:
+        # Clean up the temporary file
+        try:
+            os.unlink(temp_file_path)
+        except:
+            pass
 
 def run_claude_interaction(config, session_state, is_review=False):
     """Run a single Claude interaction for a task or review."""
