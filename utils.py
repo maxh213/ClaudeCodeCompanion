@@ -333,8 +333,8 @@ def commit_changes(repo_path, commit_message, use_gh_cli=False):
 
 def get_next_task(todo_content):
     """Extract the next uncompleted task or task for review from TODO.md."""
-    # First check for tasks marked for review (lines with "[R]")
-    review_tasks = re.findall(r'^(\s*[-*] \[R\].+)$', todo_content, re.MULTILINE)
+    # First check for tasks marked for review (lines with "[review]")
+    review_tasks = re.findall(r'^(\s*[-*] \[review\].+)$', todo_content, re.MULTILINE)
     
     if review_tasks:
         # Return the first task marked for review
