@@ -183,6 +183,17 @@ def run_claude_api(prompt, repo_path, api_key=None):
     print(f"\n[Claude Agent] Working on task in {repo_path}...")
     print("[Claude Agent] Using Claude Code CLI with live streaming...")
     
+    # Display the prompt we're sending to Claude
+    print("\n" + "="*80)
+    print("📝 PROMPT BEING SENT TO CLAUDE:")
+    print("="*80)
+    # Format the prompt with indentation and syntax highlighting
+    prompt_lines = prompt.split('\n')
+    for line in prompt_lines:
+        # Add some indentation for readability
+        print(f"  {line}")
+    print("="*80 + "\n")
+    
     # Create a temporary file for the prompt
     temp_file_path = None
     try:
