@@ -172,80 +172,162 @@ def initialize_session(config):
     return session_state
 
 def run_claude_api(prompt, repo_path, api_key=None):
-    """Run a Claude API request using the local 'claude code' command-line tool."""
-    
+    """Run a Claude API request using Claude Code CLI tool."""
     import subprocess
     import tempfile
     import os
+    import json
     
     print(f"\n[Claude Agent] Working on task in {repo_path}...")
-    print("[Claude Agent] Sending prompt to Claude via 'claude code' command line...")
     
-    # Save the prompt to a temporary file
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as temp_file:
-        temp_file_path = temp_file.name
-        temp_file.write(prompt)
-    
+    # First, check if Claude Code is installed
     try:
-        # Run the claude code command with the temporary file as input
-        print("[Claude Agent] Executing claude code command...")
-        result = subprocess.run(
-            ['claude', 'code', '--file', temp_file_path],
-            capture_output=True,
-            text=True,
-            check=True,
-            cwd=repo_path
-        )
+        # Check if claude command is available
+        result = subprocess.run(['claude', '--version'], 
+                             capture_output=True, 
+                             text=True, 
+                             check=False)
         
-        # Get the response from stdout
-        response = result.stdout
-        
-        # Log success
-        print("[Claude Agent] Successfully received response from Claude")
-        print(f"[Claude Agent] Response length: {len(response)} characters")
-        
-        # Validate response
-        if not response or len(response.strip()) < 10:
-            print("[Claude Agent] Warning: Response seems too short, might indicate an error")
-        
-        return response
+        if result.returncode == 0:
+            claude_code_available = True
+            print("[Claude Agent] Claude Code detected. Using Claude Code CLI...")
+        else:
+            claude_code_available = False
+            print("[Claude Agent] Claude Code not found. Falling back to manual mode...")
+    except FileNotFoundError:
+        claude_code_available = False
+        print("[Claude Agent] Claude Code not installed. Falling back to manual mode...")
     
-    except subprocess.CalledProcessError as e:
-        # Handle error in the command execution
-        error_message = f"Error executing claude code command: {e}"
-        if e.stderr:
-            error_message += f"\nDetails: {e.stderr}"
-        
-        print(f"[Claude Agent] {error_message}")
-        print("[Claude Agent] Falling back to manual input mode...")
-        
-        # Fallback to manual mode if the command fails
-        print("\n" + "="*80)
-        print("PROMPT FOR CLAUDE:")
-        print("="*80)
-        print(prompt)
-        print("="*80 + "\n")
-        
-        print("[Claude Agent] Please copy this prompt to Claude and paste Claude's response below.")
-        print("[Claude Agent] Type 'DONE' on a new line when finished.")
-        
-        # Collect user input until they indicate they're done
-        lines = []
-        while True:
-            line = input()
-            if line.strip() == "DONE":
-                break
-            lines.append(line)
-        
-        response = "\n".join(lines)
-        return response
-    
-    finally:
-        # Clean up the temporary file
+    # Use Claude Code if available
+    if claude_code_available:
         try:
-            os.unlink(temp_file_path)
-        except:
-            pass
+            # Save prompt to temporary file
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as temp_file:
+                temp_file_path = temp_file.name
+                temp_file.write(prompt)
+            
+            # Run Claude Code in print mode with json output format for automation
+            print("[Claude Agent] Running Claude Code CLI...")
+            cmd = ['claude', '-p', '--output-format', 'json', '--max-turns', '5']
+            
+            # Add the prompt (reading from file to handle large prompts better)
+            with open(temp_file_path, 'r') as f:
+                prompt_text = f.read()
+            
+            # Run Claude Code with the prompt
+            proc = subprocess.run(
+                cmd,
+                input=prompt_text,
+                capture_output=True,
+                text=True,
+                cwd=repo_path
+            )
+            
+            if proc.returncode == 0:
+                try:
+                    # Parse the JSON output
+                    output = json.loads(proc.stdout)
+                    response = output.get('result', '')
+                    
+                    print("[Claude Agent] Claude Code execution successful")
+                    print(f"[Claude Agent] Response length: {len(response)} characters")
+                    
+                    # Save the response for reference
+                    response_file = Path(repo_path) / "claude_response.txt"
+                    with open(response_file, 'w') as f:
+                        f.write(response)
+                    print(f"[Claude Agent] Saved Claude's response to {response_file}")
+                    
+                    return response
+                except json.JSONDecodeError:
+                    print("[Claude Agent] Error parsing Claude Code output as JSON")
+                    print("[Claude Agent] Falling back to raw output...")
+                    response = proc.stdout
+                    return response
+            else:
+                print(f"[Claude Agent] Claude Code execution failed with exit code {proc.returncode}")
+                print(f"[Claude Agent] Error: {proc.stderr}")
+                print("[Claude Agent] Falling back to manual mode...")
+        except Exception as e:
+            print(f"[Claude Agent] Error running Claude Code: {str(e)}")
+            print("[Claude Agent] Falling back to manual mode...")
+        finally:
+            # Clean up temp file
+            try:
+                os.unlink(temp_file_path)
+            except:
+                pass
+    
+    # If we have API key, try using Anthropic package 
+    if api_key and not claude_code_available:
+        try:
+            print("[Claude Agent] Trying to use Anthropic API...")
+            
+            # Import dynamically only if needed
+            import anthropic
+            
+            # The newest Anthropic model is "claude-3-5-sonnet-20241022" which was released October 22, 2024
+            client = anthropic.Anthropic(api_key=api_key)
+            
+            message = client.messages.create(
+                model="claude-3-5-sonnet-20241022",
+                max_tokens=4000,
+                temperature=0.2,
+                system="You are an expert programmer assisting with coding tasks. Follow instructions precisely.",
+                messages=[{"role": "user", "content": prompt}]
+            )
+            
+            response = message.content[0].text
+            
+            print("[Claude Agent] Successfully received response from Claude API")
+            print(f"[Claude Agent] Response length: {len(response)} characters")
+            
+            return response
+            
+        except Exception as e:
+            print(f"[Claude Agent] Error using Anthropic API: {str(e)}")
+            print("[Claude Agent] Falling back to manual mode...")
+    
+    # Manual fallback mode if all else fails
+    # Save the prompt to a file for convenience
+    prompt_file = Path(repo_path) / "claude_prompt.txt"
+    try:
+        with open(prompt_file, 'w') as f:
+            f.write(prompt)
+        print(f"[Claude Agent] Saved prompt to {prompt_file}")
+    except Exception as e:
+        print(f"[Claude Agent] Warning: Could not save prompt to file: {e}")
+    
+    print("\n" + "="*80)
+    print("PROMPT FOR CLAUDE:")
+    print("="*80)
+    print(prompt)
+    print("="*80 + "\n")
+    
+    print("[Claude Agent] Please use Claude Code or copy this prompt to Claude.")
+    print("[Claude Agent] Then paste Claude's response below.")
+    print("[Claude Agent] Type 'DONE' on a new line when finished.")
+    
+    # Collect user input until they indicate they're done
+    lines = []
+    while True:
+        line = input()
+        if line.strip() == "DONE":
+            break
+        lines.append(line)
+    
+    response = "\n".join(lines)
+    
+    # Save the response for reference
+    try:
+        response_file = Path(repo_path) / "claude_response.txt"
+        with open(response_file, 'w') as f:
+            f.write(response)
+        print(f"[Claude Agent] Saved Claude's response to {response_file}")
+    except Exception as e:
+        print(f"[Claude Agent] Warning: Could not save response to file: {e}")
+    
+    return response
 
 def run_claude_interaction(config, session_state, is_review=False):
     """Run a single Claude interaction for a task or review."""
